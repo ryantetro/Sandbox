@@ -5,10 +5,7 @@ import { MongoClient } from "mongodb";
 // MongoDB URI stored in .env file
 const uri = process.env.MONGO_URI as string;
 
-const client = new MongoClient(uri, {
-  useNewUrlParser: true,
-  useUnifiedTopology: true,
-});
+const client = new MongoClient(uri);
 
 let clientPromise: Promise<MongoClient>;
 
