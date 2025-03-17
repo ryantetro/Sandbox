@@ -1,0 +1,272 @@
+/* Global Styling */
+body {
+    background-color: #f7fafc;
+    font-family: 'Arial', sans-serif;
+    color: #333;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    min-height: 100vh;
+  }
+  
+  /* Sidebar */
+  .sidebar {
+    width: 250px;
+    background-color: #2d3a48;
+    color: white;
+    height: 100vh;
+    padding-top: 20px;
+    position: fixed;
+    top: 0;
+    left: 0;
+    display: flex;
+    flex-direction: column;
+  }
+  
+  .sidebar h3 {
+    text-align: center;
+    font-size: 1.5rem;
+    margin-bottom: 40px;
+  }
+  
+  .sidebar-nav {
+    list-style: none;
+    padding: 0;
+  }
+  
+  .sidebar-nav li {
+    padding: 15px;
+    cursor: pointer;
+    border-bottom: 1px solid #34495e;
+  }
+  
+  .sidebar-nav li:hover {
+    background-color: #34495e;
+  }
+  
+  .sidebar-nav li a {
+    color: white;
+    text-decoration: none;
+    display: block;
+  }
+  
+  /* Dashboard Main */
+  .dashboard-container {
+    margin-left: 250px;
+    padding: 20px;
+    width: 100%;
+    display: flex;
+    flex-direction: column;
+  }
+  
+  .dashboard-header {
+    font-size: 2rem;
+    font-weight: bold;
+    color: #2c3e50;
+    margin-bottom: 20px;
+  }
+  
+  .stats-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 20px;
+    margin-bottom: 20px;
+  }
+  
+  .stats-card {
+    background-color: #fff;
+    padding: 20px;
+    border-radius: 8px;
+    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
+  }
+  
+  .stats-card h3 {
+    font-size: 1.5rem;
+    color: #2c3e50;
+  }
+  
+  .stats-card .value {
+    font-size: 2rem;
+    font-weight: bold;
+    margin-top: 10px;
+  }
+  
+  .stats-card .growth {
+    font-size: 1rem;
+    color: green;
+  }
+  
+  .chart-section {
+    background-color: #fff;
+    padding: 20px;
+    border-radius: 8px;
+    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
+    margin-bottom: 20px;
+  }
+  
+  .chart-section h2 {
+    font-size: 1.5rem;
+    color: #2c3e50;
+  }
+  
+  .chart {
+    width: 100%;
+    height: 300px;
+  }
+  
+  .settings-section {
+    background-color: #fff;
+    padding: 20px;
+    border-radius: 8px;
+    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
+  }
+  
+  .settings-section h2 {
+    font-size: 1.5rem;
+    color: #2c3e50;
+  }
+  
+  /* Header */
+  .header {
+    padding: 15px;
+    background-color: #fff;
+    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+  
+  .header .user-info {
+    display: flex;
+    align-items: center;
+  }
+  
+  .header .user-info img {
+    border-radius: 50%;
+    width: 40px;
+    height: 40px;
+    margin-right: 10px;
+  }
+  
+  .header .user-info span {
+    font-size: 1rem;
+    font-weight: bold;
+  }
+  
+  .header .notifications {
+    font-size: 1.2rem;
+    cursor: pointer;
+  }
+  
+  /* Responsive Styles */
+  @media (max-width: 768px) {
+    .sidebar {
+      width: 200px;
+    }
+    .dashboard-container {
+      margin-left: 200px;
+    }
+    .stats-grid {
+      grid-template-columns: 1fr 1fr;
+    }
+  }
+  
+  /* Task Styling */
+  .task-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 10px;
+    border-bottom: 1px solid #ddd;
+  }
+  
+  .task-item.completed {
+    text-decoration: line-through;
+    color: #888;
+  }
+  
+  .task-item input {
+    margin-right: 10px;
+  }
+  
+  .task-item .delete-task {
+    background-color: transparent;
+    border: none;
+    color: #e74c3c;
+    cursor: pointer;
+  }
+  
+  .task-item .delete-task:hover {
+    text-decoration: underline;
+  }
+  
+  /* Form Styling */
+  .input-field {
+    padding: 12px;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    font-size: 1rem;
+    color: #333;
+    outline: none;
+    margin-bottom: 10px;
+  }
+  
+  .input-field:focus {
+    border-color: #007bff;
+  }
+  
+  .submit-button {
+    padding: 12px;
+    background-color: #007bff;
+    color: white;
+    border: none;
+    border-radius: 4px;
+    font-size: 1rem;
+    cursor: pointer;
+  }
+  
+  .submit-button:disabled {
+    background-color: #d6d6d6;
+    cursor: not-allowed;
+  }
+  
+  .error-message {
+    color: #e74c3c;
+    font-size: 0.9rem;
+  }
+  
+  /* Dark Mode */
+  @media (prefers-color-scheme: dark) {
+    body {
+      background-color: #181818;
+      color: #f7fafc;
+    }
+  
+    .sidebar {
+      background-color: #212b36;
+    }
+  
+    .dashboard-header {
+      color: #f7fafc;
+    }
+  
+    .stats-card {
+      background-color: #2c3e50;
+      color: #f7fafc;
+    }
+  
+    .settings-section {
+      background-color: #2c3e50;
+      color: #f7fafc;
+    }
+  
+    .task-item {
+      background-color: #1c2532;
+      color: #f7fafc;
+    }
+  
+    .submit-button {
+      background-color: #007bff;
+    }
+  }
+  
