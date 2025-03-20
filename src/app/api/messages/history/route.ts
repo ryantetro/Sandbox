@@ -1,9 +1,21 @@
-import { PrismaClient } from "@prisma/client";
+// src/app/api/messages/history/route.ts
+import prisma from "../../../../lib/prisma"; // Adjust the path
 import { NextResponse } from "next/server";
 
-const prisma = new PrismaClient();
-
 export async function GET() {
-  const history = await prisma.messageHistory.findMany();
-  return NextResponse.json(history);
+  try {
+    const history = await prisma.messageHistory.findMany({
+      include: {
+        automatedMessage: {
+          include: {
+            project: true,
+          },
+        },
+      },
+    });
+    return NextResponse.json(history);
+  } catch (error) {
+    console.error("GET /api/messages/history error:", error);
+    return NextResponse.json({ error: "Failed to fetch message history" }, { status: 500 });
+  }
 }

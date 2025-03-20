@@ -1,53 +1,64 @@
-import { PrismaClient } from "@prisma/client";
+// src/app/api/subcontractors/route.ts
+import prisma from "@/lib/prisma";
 import { NextResponse } from "next/server";
-
-const prisma = new PrismaClient();
-
 
 export async function GET() {
   try {
     const subcontractors = await prisma.subcontractor.findMany();
-    console.log("GET - Fetched subcontractors:", subcontractors);
     return NextResponse.json(subcontractors);
   } catch (error) {
-    console.error("GET - Error fetching subcontractors:", error);
+    console.error("GET /api/subcontractors error:", error);
     return NextResponse.json({ error: "Failed to fetch subcontractors" }, { status: 500 });
   }
 }
 
 export async function POST(request: Request) {
   try {
-    const data = await request.json();
-    console.log("POST - Received data:", data);
+    const { name, phone, projects, role, status } = await request.json();
+    if (!name || !phone || !role || !status) {
+      return NextResponse.json({ error: "Missing required fields" }, { status: 400 });
+    }
     const subcontractor = await prisma.subcontractor.create({
       data: {
-        name: data.name,
-        phone: data.phone,
-        projects: data.projects, // Should be an array of strings
-        role: data.role,
-        status: data.status || "Active",
+        name,
+        phone,
+        projects: projects || [],
+        role,
+        status,
       },
     });
-    console.log("POST - Created subcontractor:", subcontractor);
     return NextResponse.json(subcontractor, { status: 201 });
   } catch (error) {
-    console.error("POST - Error creating subcontractor:", error);
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    console.error("POST /api/subcontractors error:", error);
+    return NextResponse.json({ error: "Failed to create subcontractor" }, { status: 500 });
   }
 }
 
-// src/app/api/subcontractors/route.ts
-export async function DELETE(request: Request) {
-    try {
-      const { id } = await request.json();
-      console.log("DELETE - Subcontractor ID:", id);
-      const deletedSubcontractor = await prisma.subcontractor.delete({
-        where: { id },
-      });
-      console.log("DELETE - Deleted subcontractor:", deletedSubcontractor);
-      return NextResponse.json(deletedSubcontractor);
-    } catch (error) {
-      console.error("DELETE - Error deleting subcontractor:", error);
-      return NextResponse.json({ error: error.message }, { status: 500 });
+export async function PATCH(request: Request) {
+  try {
+    const { id, projects } = await request.json();
+    if (!id || !projects) {
+      return NextResponse.json({ error: "Missing required fields" }, { status: 400 });
     }
+
+    const subcontractor = await prisma.subcontractor.findUnique({
+      where: { id },
+    });
+
+    if (!subcontractor) {
+      return NextResponse.json({ error: "Subcontractor not found" }, { status: 404 });
+    }
+
+    const updatedSubcontractor = await prisma.subcontractor.update({
+      where: { id },
+      data: {
+        projects,
+      },
+    });
+
+    return NextResponse.json(updatedSubcontractor);
+  } catch (error) {
+    console.error("PATCH /api/subcontractors error:", error);
+    return NextResponse.json({ error: "Failed to update subcontractor" }, { status: 500 });
   }
+}

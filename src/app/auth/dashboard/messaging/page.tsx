@@ -1,3 +1,4 @@
+// src/app/auth/dashboard/messaging/page.tsx
 "use client";
 
 import { useState, useEffect } from "react";
@@ -117,14 +118,25 @@ function Button({ children, onClick, className }: ButtonProps) {
 interface InputProps {
   placeholder?: string;
   value: string;
-  onChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
+  onChange: (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => void;
   className?: string;
+  type?: string;
 }
 
-function Input({ placeholder, value, onChange, className }: InputProps) {
+function Input({ placeholder, value, onChange, className, type = "text" }: InputProps) {
+  if (type === "textarea") {
+    return (
+      <textarea
+        placeholder={placeholder}
+        value={value}
+        onChange={onChange}
+        className={`add-task-input ${className || ""}`}
+      />
+    );
+  }
   return (
     <input
-      type="text"
+      type={type}
       placeholder={placeholder}
       value={value}
       onChange={onChange}
@@ -136,19 +148,30 @@ function Input({ placeholder, value, onChange, className }: InputProps) {
 // Custom Select Component
 interface SelectProps {
   children: React.ReactNode;
-  onValueChange?: (value: string) => void;
-  value?: string;
+  onValueChange?: (value: string | string[]) => void;
+  value?: string | string[];
   options: { value: string; label: string }[];
+  multiple?: boolean;
 }
 
-function Select({ children, onValueChange, value, options }: SelectProps) {
+function Select({ children, onValueChange, value, options, multiple = false }: SelectProps) {
   const [isOpen, setIsOpen] = useState(false);
 
   const handleSelect = (selectedValue: string) => {
-    if (onValueChange) {
-      onValueChange(selectedValue);
+    if (multiple) {
+      const currentValues = (value as string[]) || [];
+      const newValues = currentValues.includes(selectedValue)
+        ? currentValues.filter((v) => v !== selectedValue)
+        : [...currentValues, selectedValue];
+      if (onValueChange) {
+        onValueChange(newValues);
+      }
+    } else {
+      if (onValueChange) {
+        onValueChange(selectedValue);
+      }
+      setIsOpen(false);
     }
-    setIsOpen(false); // Close the dropdown after selection
   };
 
   return (
@@ -159,7 +182,11 @@ function Select({ children, onValueChange, value, options }: SelectProps) {
             return React.cloneElement(child, {
               onToggle: () => setIsOpen(!isOpen),
               isOpen,
-              selectedLabel: options.find((opt) => opt.value === value)?.label || "Select a project",
+              selectedLabel: multiple
+                ? (value as string[])?.length > 0
+                  ? `${(value as string[]).length} selected`
+                  : "Select subcontractors"
+                : options.find((opt) => opt.value === value)?.label || "Select an option",
             } as any);
           }
           if (child.type === SelectContent) {
@@ -236,49 +263,62 @@ function SelectItem({ value, children, onSelect }: SelectItemProps) {
 
 // Interfaces for Data
 interface Subcontractor {
-  id: string; // Updated to string for MongoDB ObjectId
+  id: string;
   name: string;
   phone: string;
-  projects: string[]; // Updated to string[] for MongoDB ObjectIds
+  projects: string[];
   role?: string;
   status: string;
 }
 
 interface Project {
-  id: string; // Updated to string for MongoDB ObjectId
+  id: string;
   name: string;
   jobSiteAddress: string;
-  subcontractorIds: number[];
+  subcontractorIds: string[];
 }
 
 interface Schedule {
-  id: string; // Updated to string for MongoDB ObjectId
-  projectId: string; // Updated to string for MongoDB ObjectId
-  subcontractorId: string; // Updated to string for MongoDB ObjectId
+  id: string;
+  projectId: string;
+  subcontractorId: string;
   date: string;
   time: string;
   confirmed: boolean;
 }
 
 interface AutomatedMessage {
-  id: string; // Updated to string for MongoDB ObjectId
+  id: string;
   name: string;
   content: string;
-  projectId: string; // Updated to string for MongoDB ObjectId
+  projectId: string;
   deliveryMethod: string;
   trigger: { type: string; offset: string };
   status: string;
   lastSent?: string;
+  date?: string;
+  time?: string;
+  type: string;
+  subcontractorIds: string[];
+  replies: MessageReply[];
 }
 
 interface MessageHistory {
-  id: string; // Updated to string for MongoDB ObjectId
-  messageId: string; // Updated to string for MongoDB ObjectId
+  id: string;
+  messageId: string;
   content: string;
-  recipientId: string; // Updated to string for MongoDB ObjectId
+  recipientId: string;
   deliveryMethod: string;
   sentAt: string;
   status: string;
+}
+
+interface MessageReply {
+  id: string;
+  messageId: string;
+  subcontractorId: string;
+  reply: string;
+  createdAt: string;
 }
 
 export default function Messaging() {
@@ -296,6 +336,7 @@ export default function Messaging() {
   const [schedules, setSchedules] = useState<Schedule[]>([]);
   const [messages, setMessages] = useState<AutomatedMessage[]>([]);
   const [messageHistory, setMessageHistory] = useState<MessageHistory[]>([]);
+  const [replies, setReplies] = useState<MessageReply[]>([]);
   const [projects, setProjects] = useState<Project[]>([]);
   const [newMessage, setNewMessage] = useState({
     name: "",
@@ -304,6 +345,11 @@ export default function Messaging() {
     deliveryMethod: "SMS",
     trigger: { type: "schedule-based", offset: "-24h" },
     status: "Active",
+    date: "",
+    time: "",
+    type: "reminder",
+    subcontractorIds: [] as string[],
+    customContent: "",
   });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -319,17 +365,46 @@ export default function Messaging() {
     label: project.name,
   }));
 
+  // Map subcontractors to options for the Select component
+  const subcontractorOptions = subcontractors.map((sub) => ({
+    value: sub.id,
+    label: `${sub.name} (${sub.role || "N/A"})`,
+  }));
+
+  // Trigger options
+  const triggerOptions = [
+    { value: "-1h", label: "1 hour before" },
+    { value: "-24h", label: "24 hours before" },
+    { value: "-48h", label: "48 hours before" },
+    { value: "-1w", label: "1 week before" },
+  ];
+
+  // Message type options
+  const messageTypeOptions = [
+    { value: "reminder", label: "Reminder" },
+    { value: "reschedule", label: "Reschedule" },
+    { value: "update", label: "Project Update" },
+  ];
+
+  // Default message templates
+  const defaultMessages = {
+    reminder: "You’re scheduled to work on {ProjectName} at {JobSiteAddress} on {Date} at {Time}. Reply YES to confirm.",
+    reschedule: "The schedule for {ProjectName} at {JobSiteAddress} has changed to {Date} at {Time}. Reply YES to confirm.",
+    update: "Update for {ProjectName}: {CustomContent}",
+  };
+
   // Fetch data on component mount
   useEffect(() => {
     const fetchData = async () => {
       try {
         setLoading(true);
-        const [subcontractorsRes, projectsRes, schedulesRes, messagesRes, historyRes] = await Promise.all([
+        const [subcontractorsRes, projectsRes, schedulesRes, messagesRes, historyRes, repliesRes] = await Promise.all([
           fetch("/api/subcontractors"),
           fetch("/api/projects"),
           fetch("/api/schedules"),
           fetch("/api/messages/automated"),
           fetch("/api/messages/history"),
+          fetch("/api/messages/replies"),
         ]);
 
         const errors: string[] = [];
@@ -351,7 +426,11 @@ export default function Messaging() {
         }
         if (!historyRes.ok) {
           const errorText = await historyRes.text();
-          errors.push(`History API failed: ${historyRes.status} ${schedulesRes.statusText} - ${errorText}`);
+          errors.push(`History API failed: ${historyRes.status} ${historyRes.statusText} - ${errorText}`);
+        }
+        if (!repliesRes.ok) {
+          const errorText = await repliesRes.text();
+          errors.push(`Replies API failed: ${repliesRes.status} ${repliesRes.statusText} - ${errorText}`);
         }
 
         if (errors.length > 0) {
@@ -364,6 +443,7 @@ export default function Messaging() {
         const schedulesData = await schedulesRes.json();
         const messagesData = await messagesRes.json();
         const historyData = await historyRes.json();
+        const repliesData = await repliesRes.json();
 
         console.log("Subcontractors Data:", subcontractorsData);
         console.log("Projects Data:", projectsData);
@@ -373,6 +453,7 @@ export default function Messaging() {
         setSchedules(schedulesData);
         setMessages(messagesData);
         setMessageHistory(historyData);
+        setReplies(repliesData);
       } catch (error) {
         console.error("Error fetching data:", error);
         setError(error instanceof Error ? error.message : "Failed to load data. Please try again later.");
@@ -386,15 +467,40 @@ export default function Messaging() {
 
   const handleCreateMessage = async () => {
     if (!newMessage.name || !newMessage.projectId) {
-      alert("Please provide a reminder name and select a project.");
+      alert("Please provide a message name and select a project.");
+      return;
+    }
+
+    if ((newMessage.type === "reminder" || newMessage.type === "reschedule") && (!newMessage.date || !newMessage.time)) {
+      alert("Please provide a date and time for the schedule.");
+      return;
+    }
+
+    if (newMessage.type === "update" && !newMessage.customContent) {
+      alert("Please provide the update message content.");
       return;
     }
 
     try {
+      const content = newMessage.type === "update"
+        ? defaultMessages.update.replace("{CustomContent}", newMessage.customContent)
+        : defaultMessages[newMessage.type];
+
       const response = await fetch("/api/messages/automated", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ ...newMessage, projectId: newMessage.projectId }),
+        body: JSON.stringify({
+          name: newMessage.name,
+          content,
+          projectId: newMessage.projectId,
+          deliveryMethod: newMessage.deliveryMethod,
+          trigger: newMessage.trigger,
+          status: newMessage.status,
+          date: newMessage.date,
+          time: newMessage.time,
+          type: newMessage.type,
+          subcontractorIds: newMessage.subcontractorIds,
+        }),
       });
 
       if (!response.ok) {
@@ -405,15 +511,20 @@ export default function Messaging() {
       setMessages([...messages, message]);
       setNewMessage({
         name: "",
-        content: "You’re scheduled to work on {ProjectName} at {JobSiteAddress} on {Date} at {Time}. Reply YES to confirm.",
+        content: defaultMessages.reminder,
         projectId: "",
         deliveryMethod: "SMS",
         trigger: { type: "schedule-based", offset: "-24h" },
         status: "Active",
+        date: "",
+        time: "",
+        type: "reminder",
+        subcontractorIds: [],
+        customContent: "",
       });
     } catch (error) {
       console.error("Error creating message:", error);
-      alert("Failed to create reminder. Please try again.");
+      alert("Failed to create message. Please try again.");
     }
   };
 
@@ -663,7 +774,27 @@ export default function Messaging() {
                     </div>
                     <div className="section-content">
                       <div className="add-task-form">
-                        <h3 className="add-task-title">Create Job Site Reminder</h3>
+                        <h3 className="add-task-title">Create Job Site Message</h3>
+                        <div className="add-task-grid">
+                          <div>
+                            <Select
+                              onValueChange={(value) => setNewMessage({ ...newMessage, type: value })}
+                              value={newMessage.type}
+                              options={messageTypeOptions}
+                            >
+                              <SelectTrigger>
+                                <SelectValue placeholder="Select message type" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {messageTypeOptions.map((option) => (
+                                  <SelectItem key={option.value} value={option.value}>
+                                    {option.label}
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          </div>
+                        </div>
                         <div className="add-task-grid">
                           <div>
                             <Select
@@ -686,8 +817,29 @@ export default function Messaging() {
                         </div>
                         <div className="add-task-grid">
                           <div>
+                            <Select
+                              onValueChange={(value) => setNewMessage({ ...newMessage, subcontractorIds: value })}
+                              value={newMessage.subcontractorIds}
+                              options={subcontractorOptions}
+                              multiple
+                            >
+                              <SelectTrigger>
+                                <SelectValue placeholder="Select subcontractors" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {subcontractorOptions.map((sub) => (
+                                  <SelectItem key={sub.value} value={sub.value}>
+                                    {sub.label}
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          </div>
+                        </div>
+                        <div className="add-task-grid">
+                          <div>
                             <Input
-                              placeholder="Reminder Name"
+                              placeholder="Message Name"
                               value={newMessage.name}
                               onChange={(e) =>
                                 setNewMessage({ ...newMessage, name: e.target.value })
@@ -695,20 +847,74 @@ export default function Messaging() {
                             />
                           </div>
                         </div>
-                        <div className="add-task-grid">
-                          <div>
-                            <Input
-                              placeholder="Message Content"
-                              value={newMessage.content}
-                              onChange={(e) =>
-                                setNewMessage({ ...newMessage, content: e.target.value })
-                              }
-                            />
+                        {(newMessage.type === "reminder" || newMessage.type === "reschedule") && (
+                          <>
+                            <div className="add-task-grid">
+                              <div>
+                                <Input
+                                  type="date"
+                                  value={newMessage.date}
+                                  onChange={(e) =>
+                                    setNewMessage({ ...newMessage, date: e.target.value })
+                                  }
+                                />
+                              </div>
+                            </div>
+                            <div className="add-task-grid">
+                              <div>
+                                <Input
+                                  type="time"
+                                  value={newMessage.time}
+                                  onChange={(e) =>
+                                    setNewMessage({ ...newMessage, time: e.target.value })
+                                  }
+                                />
+                              </div>
+                            </div>
+                            <div className="add-task-grid">
+                              <div>
+                                <Select
+                                  onValueChange={(value) =>
+                                    setNewMessage({
+                                      ...newMessage,
+                                      trigger: { type: "schedule-based", offset: value },
+                                    })
+                                  }
+                                  value={newMessage.trigger.offset}
+                                  options={triggerOptions}
+                                >
+                                  <SelectTrigger>
+                                    <SelectValue placeholder="Select trigger time" />
+                                  </SelectTrigger>
+                                  <SelectContent>
+                                    {triggerOptions.map((option) => (
+                                      <SelectItem key={option.value} value={option.value}>
+                                        {option.label}
+                                      </SelectItem>
+                                    ))}
+                                  </SelectContent>
+                                </Select>
+                              </div>
+                            </div>
+                          </>
+                        )}
+                        {newMessage.type === "update" && (
+                          <div className="add-task-grid">
+                            <div>
+                              <Input
+                                type="textarea"
+                                placeholder="Update Message Content"
+                                value={newMessage.customContent}
+                                onChange={(e) =>
+                                  setNewMessage({ ...newMessage, customContent: e.target.value })
+                                }
+                              />
+                            </div>
                           </div>
-                        </div>
+                        )}
                         <div className="add-task-footer">
                           <Button onClick={handleCreateMessage}>
-                            Create Reminder
+                            Create {newMessage.type.charAt(0).toUpperCase() + newMessage.type.slice(1)}
                           </Button>
                         </div>
                       </div>
@@ -716,25 +922,31 @@ export default function Messaging() {
                         <table className="message-table">
                           <thead>
                             <tr>
+                              <th>Type</th>
                               <th>Project</th>
                               <th>Message</th>
                               <th>Trigger</th>
                               <th>Status</th>
+                              <th>Confirmations</th>
                             </tr>
                           </thead>
                           <tbody>
                             {messages.map((msg) => (
                               <tr key={msg.id}>
+                                <td>{msg.type}</td>
                                 <td>{projects.find((p) => p.id === msg.projectId)?.name || "Unknown"}</td>
                                 <td>{msg.content}</td>
-                                <td>{msg.trigger.offset} before schedule</td>
+                                <td>{msg.trigger.offset || "Immediate"}</td>
                                 <td>{msg.status}</td>
+                                <td>
+                                  {(msg.replies || []).filter((r) => r.reply.toUpperCase() === "YES").length} / {msg.subcontractorIds.length}
+                                </td>
                               </tr>
                             ))}
                           </tbody>
                         </table>
                       ) : (
-                        <p className="no-tasks">No reminders created yet.</p>
+                        <p className="no-tasks">No messages created yet.</p>
                       )}
                     </div>
                   </div>

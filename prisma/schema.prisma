@@ -11,26 +11,27 @@ model Subcontractor {
   id         String      @id @default(auto()) @map("_id") @db.ObjectId
   name       String
   phone      String
-  projects   String[]       // Consider converting to String[] if Project IDs become ObjectId strings
+  projects   String[]    @db.ObjectId
   role       String?
   status     String      @default("Active")
   schedules  Schedule[]
+  replies    MessageReply[] // Add relation to replies
 }
 
 model Project {
   id                 String               @id @default(auto()) @map("_id") @db.ObjectId
   name               String
   jobSiteAddress     String
-  subcontractorIds   String[]                // Consider converting to String[] if needed
+  subcontractorIds   String[]             @db.ObjectId
   schedules          Schedule[]
   automatedMessages  AutomatedMessage[]
 }
 
 model Schedule {
   id              String        @id @default(auto()) @map("_id") @db.ObjectId
-  projectId       String
+  projectId       String        @db.ObjectId
   project         Project       @relation(fields: [projectId], references: [id])
-  subcontractorId String
+  subcontractorId String        @db.ObjectId
   subcontractor   Subcontractor @relation(fields: [subcontractorId], references: [id])
   date            String
   time            String
@@ -41,22 +42,37 @@ model AutomatedMessage {
   id               String            @id @default(auto()) @map("_id") @db.ObjectId
   name             String
   content          String
-  projectId        String
+  projectId        String            @db.ObjectId
   project          Project           @relation(fields: [projectId], references: [id])
   deliveryMethod   String
   trigger          Json              // e.g., { "type": "schedule-based", "offset": "-24h" }
   status           String            @default("Active")
   lastSent         String?
   messageHistory   MessageHistory[]
+  date             String?           // Add date field
+  time             String?           // Add time field
+  type             String            // Add type field (e.g., "reminder", "reschedule", "update")
+  subcontractorIds String[]          @db.ObjectId // Add subcontractorIds field
+  replies          MessageReply[]    // Add relation to replies
 }
 
 model MessageHistory {
   id               String            @id @default(auto()) @map("_id") @db.ObjectId
-  messageId        String
+  messageId        String            @db.ObjectId
   automatedMessage AutomatedMessage  @relation(fields: [messageId], references: [id])
   content          String
-  recipientId      String
+  recipientId      String            @db.ObjectId
   deliveryMethod   String
   sentAt           String
   status           String
+}
+
+model MessageReply {
+  id              String           @id @default(auto()) @map("_id") @db.ObjectId
+  messageId       String           @db.ObjectId
+  message         AutomatedMessage @relation(fields: [messageId], references: [id])
+  subcontractorId String           @db.ObjectId
+  subcontractor   Subcontractor    @relation(fields: [subcontractorId], references: [id])
+  reply           String
+  createdAt       DateTime         @default(now())
 }
