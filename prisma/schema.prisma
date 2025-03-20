@@ -1,0 +1,62 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mongodb"
+  url      = "mongodb+srv://ryanandalex:Sandbox2025!@sandbox.s9imj.mongodb.net/sandbox?retryWrites=true&w=majority"
+}
+
+model Subcontractor {
+  id         String      @id @default(auto()) @map("_id") @db.ObjectId
+  name       String
+  phone      String
+  projects   String[]       // Consider converting to String[] if Project IDs become ObjectId strings
+  role       String?
+  status     String      @default("Active")
+  schedules  Schedule[]
+}
+
+model Project {
+  id                 String               @id @default(auto()) @map("_id") @db.ObjectId
+  name               String
+  jobSiteAddress     String
+  subcontractorIds   String[]                // Consider converting to String[] if needed
+  schedules          Schedule[]
+  automatedMessages  AutomatedMessage[]
+}
+
+model Schedule {
+  id              String        @id @default(auto()) @map("_id") @db.ObjectId
+  projectId       String
+  project         Project       @relation(fields: [projectId], references: [id])
+  subcontractorId String
+  subcontractor   Subcontractor @relation(fields: [subcontractorId], references: [id])
+  date            String
+  time            String
+  confirmed       Boolean       @default(false)
+}
+
+model AutomatedMessage {
+  id               String            @id @default(auto()) @map("_id") @db.ObjectId
+  name             String
+  content          String
+  projectId        String
+  project          Project           @relation(fields: [projectId], references: [id])
+  deliveryMethod   String
+  trigger          Json              // e.g., { "type": "schedule-based", "offset": "-24h" }
+  status           String            @default("Active")
+  lastSent         String?
+  messageHistory   MessageHistory[]
+}
+
+model MessageHistory {
+  id               String            @id @default(auto()) @map("_id") @db.ObjectId
+  messageId        String
+  automatedMessage AutomatedMessage  @relation(fields: [messageId], references: [id])
+  content          String
+  recipientId      String
+  deliveryMethod   String
+  sentAt           String
+  status           String
+}

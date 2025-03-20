@@ -1,10 +1,12 @@
+// src/pages/auth/dashboard.js
 "use client";
 
 import { useState, useEffect } from "react";
 import { useSession, signOut } from "next-auth/react";
 import { Session } from "next-auth";
 import { useRouter } from "next/navigation";
-import { Bell, Calendar, ChevronDown, FileText, Home, LogOut, Menu, Settings, User, X } from "lucide-react";
+import { FaBell, FaCalendar, FaChevronDown, FaFileAlt, FaTachometerAlt, FaSignOutAlt, FaBars, FaEnvelope, FaCog, FaUser, FaTimes } from "react-icons/fa";
+import Link from "next/link";
 import "../styles/dashboard.css";
 
 // Extend the Session type to include companyName and role
@@ -144,7 +146,7 @@ export default function Dashboard() {
         className="sidebar-toggle"
         onClick={() => setIsSidebarOpen(!isSidebarOpen)}
       >
-        {isSidebarOpen ? <X size={20} /> : <Menu size={20} />}
+        {isSidebarOpen ? <FaTimes className="sidebar-icon" /> : <FaBars className="sidebar-icon" />}
       </button>
 
       {/* Sidebar */}
@@ -165,16 +167,22 @@ export default function Dashboard() {
                 onClick={() => setActiveSection("dashboard")}
                 className={activeSection === "dashboard" ? "active" : ""}
               >
-                <Home />
+                <FaTachometerAlt className="sidebar-icon" />
                 <span>Dashboard</span>
               </button>
+            </li>
+            <li>
+              <Link href="/auth/dashboard/messaging" className={activeSection === "messaging" ? "active" : ""}>
+                <FaEnvelope className="sidebar-icon" />
+                <span>Messaging</span>
+              </Link>
             </li>
             <li>
               <button
                 onClick={() => setActiveSection("tasks")}
                 className={activeSection === "tasks" ? "active" : ""}
               >
-                <FileText />
+                <FaFileAlt className="sidebar-icon" />
                 <span>Tasks</span>
               </button>
             </li>
@@ -183,7 +191,7 @@ export default function Dashboard() {
                 onClick={() => setActiveSection("calendar")}
                 className={activeSection === "calendar" ? "active" : ""}
               >
-                <Calendar />
+                <FaCalendar className="sidebar-icon" />
                 <span>Calendar</span>
               </button>
             </li>
@@ -192,7 +200,7 @@ export default function Dashboard() {
                 onClick={() => setActiveSection("profile")}
                 className={activeSection === "profile" ? "active" : ""}
               >
-                <User />
+                <FaUser className="sidebar-icon" />
                 <span>Profile</span>
               </button>
             </li>
@@ -201,7 +209,7 @@ export default function Dashboard() {
                 onClick={() => setActiveSection("settings")}
                 className={activeSection === "settings" ? "active" : ""}
               >
-                <Settings />
+                <FaCog className="sidebar-icon" />
                 <span>Settings</span>
               </button>
             </li>
@@ -213,7 +221,7 @@ export default function Dashboard() {
             onClick={handleLogout}
             className="logout-button"
           >
-            <LogOut />
+            <FaSignOutAlt className="sidebar-icon" />
             <span>Logout</span>
           </button>
         </div>
@@ -226,6 +234,7 @@ export default function Dashboard() {
             <div>
               <h2 className="header-title">
                 {activeSection === "dashboard" && "Dashboard Overview"}
+                {activeSection === "messaging" && "Messaging"}
                 {activeSection === "tasks" && "Task Management"}
                 {activeSection === "calendar" && "Calendar"}
                 {activeSection === "profile" && "Your Profile"}
@@ -236,7 +245,7 @@ export default function Dashboard() {
             <div className="header-right">
               <div className="relative">
                 <button className="notification-button">
-                  <Bell />
+                  <FaBell className="sidebar-icon" />
                   {unreadNotificationsCount > 0 && (
                     <span className="notification-badge">
                       {unreadNotificationsCount}
@@ -252,7 +261,7 @@ export default function Dashboard() {
                 <span className="user-name">
                   {session?.user?.name || session?.user?.email}
                 </span>
-                <ChevronDown />
+                <FaChevronDown className="sidebar-icon" />
               </div>
             </div>
           </div>
@@ -457,7 +466,7 @@ export default function Dashboard() {
                             onClick={() => handleDeleteTask(task.id)}
                             className="delete-button"
                           >
-                            <X size={16} />
+                            <FaTimes className="sidebar-icon" />
                           </button>
                         </div>
                       </li>
