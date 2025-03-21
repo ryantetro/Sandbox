@@ -4,7 +4,7 @@ import { useState, useEffect } from "react";
 import { useSession, signOut } from "next-auth/react";
 import { Session } from "next-auth";
 import { useRouter } from "next/navigation";
-import { Bell, Calendar, ChevronDown, FileText, Home, LogOut, Menu, MessageSquare, Settings, User, X } from "lucide-react";
+import { Bell, Calendar, ChevronDown, ChevronUp, FileText, Home, LogOut, Menu, MessageSquare, Settings, User, X, FolderKanban, Kanban, Hammer, MapPin, Users, Plus, Save } from "lucide-react";
 import Link from "next/link";
 import "../styles/dashboard.css";
 
@@ -86,6 +86,12 @@ export default function Dashboard() {
     { id: 1, message: "New comment on your project", read: false },
     { id: 2, message: "Meeting scheduled for tomorrow", read: false },
   ]);
+  const [isAddProjectModalOpen, setIsAddProjectModalOpen] = useState(false);
+  const [newProject, setNewProject] = useState({
+    name: "",
+    jobSiteAddress: "",
+    subcontractorIds: [] as string[],
+  });
 
   // Handle redirect on client-side only
   useEffect(() => {
@@ -195,6 +201,45 @@ export default function Dashboard() {
     ));
   };
 
+  const handleAddProject = async (e: React.FormEvent) => {
+    e.preventDefault();
+  
+    if (!newProject.name.trim() || !newProject.jobSiteAddress.trim()) {
+      setError("Project name and address are required.");
+      return;
+    }
+  
+    try {
+      const response = await fetch("/api/projects", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          name: newProject.name,
+          jobSiteAddress: newProject.jobSiteAddress,
+          subcontractorIds: newProject.subcontractorIds,
+          userId: session?.user?.id, // Include the userId from the session
+        }),
+        credentials: "include", // Include cookies for authentication
+      });
+  
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(`Failed to create project: ${response.status} ${response.statusText} - ${errorText}`);
+      }
+  
+      const createdProject = await response.json();
+      setProjects([...projects, createdProject]); // Add the new project to the state
+      setNewProject({ name: "", jobSiteAddress: "", subcontractorIds: [] }); // Reset the form
+      setIsAddProjectModalOpen(false); // Close the modal
+      setError(null); // Clear any previous errors
+    } catch (err) {
+      console.error("Error creating project:", err);
+      setError(err instanceof Error ? err.message : "Failed to create project. Please try again.");
+    }
+  };
+
   // Get priority color class (now handled in CSS)
   const getPriorityClass = (priority?: "low" | "medium" | "high") => {
     return priority ? `task-priority ${priority}` : "task-priority";
@@ -256,7 +301,7 @@ export default function Dashboard() {
                 onClick={() => setActiveSection("projects")}
                 className={activeSection === "projects" ? "active" : ""}
               >
-                <FaProjectDiagram className="sidebar-icon" />
+                <FolderKanban />
                 <span>Projects</span>
               </button>
             </li>
@@ -457,106 +502,240 @@ export default function Dashboard() {
           {/* Projects Section */}
           {activeSection === "projects" && (
             <div style={{ display: "flex", flexDirection: "column", gap: "1.5rem" }}>
-              <div className="section add-task-form">
-                <h3 className="add-task-title">Your Projects</h3>
-
-                <div className="add-task-grid">
-                  {projects.map((project) => (
-                    <div key={project.id} className="project-item">
-                      <div>
-                        <h3>{project.name}</h3>
-                        <p>{project.jobSiteAddress}</p>
-                      </div>
-                      <div>
-                        <p>Subcontractors: {project.subcontractorIds.length}</p>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-
-                <div className="add-task-footer">
-                  <div style={{ display: "flex", alignItems: "center", gap: "1rem" }}>
-                    <label className="priority-label">
-                      <span>Priority:</span>
-                      <select
-                        value={newTaskPriority}
-                        onChange={(e) =>
-                          setNewTaskPriority(e.target.value as "low" | "medium" | "high")
-                        }
-                        className="priority-select"
-                      >
-                        <option value="low">Low</option>
-                        <option value="medium">Medium</option>
-                        <option value="high">High</option>
-                      </select>
-                    </label>
-                  </div>
-
+              {/* Project List Card */}
+              <div className="section add-project-form">
+                <div className="section-header">
+                  <h3 className="add-task-title">Projects</h3>
                   <button
-                    onClick={handleAddTask}
                     className="add-task-button"
+                    onClick={() => setIsAddProjectModalOpen(true)}
                   >
-                    Add Task
+                    Add Project
                   </button>
                 </div>
-
-                {error && <p className="error-message">{error}</p>}
-              </div>
-
-              <div className="section">
-                <div className="task-list-header">
-                  <h3 className="task-list-title">Task List</h3>
-                  <div className="task-list-stats">
-                    {completedTasks} of {tasks.length} completed
-                  </div>
-                </div>
-
-                <div className="task-list-content">
-                  <ul className="task-list">
-                    {tasks.map((task) => (
-                      <li key={task.id} className="task-item">
-                        <div className="task-item-details">
-                          <input
-                            type="checkbox"
-                            checked={task.completed}
-                            onChange={() => handleTaskCompletion(task.id)}
-                          />
-                          <span className={`task-text ${task.completed ? "completed" : ""}`}>
-                            {task.text}
-                          </span>
-                          {task.priority && (
-                            <span className={`task-priority-tag ${task.priority}`}>
-                              {task.priority}
-                            </span>
-                          )}
-                        </div>
-
-                        <div className="task-actions">
-                          {task.dueDate && (
-                            <span className={`task-due-date ${isOverdue(task.dueDate) && !task.completed ? "overdue" : ""}`}>
-                              {isOverdue(task.dueDate) && !task.completed ? "Overdue: " : "Due: "}
-                              {new Date(task.dueDate).toLocaleDateString()}
-                            </span>
-                          )}
-
-                          <button
-                            onClick={() => handleDeleteTask(task.id)}
-                            className="delete-button"
-                          >
-                            <FaTimes className="sidebar-icon" />
-                          </button>
-                        </div>
-                      </li>
-                    ))}
-                  </ul>
-
-                  {tasks.length === 0 && (
-                    <div className="no-tasks">
-                      No tasks yet. Add a task to get started.
+                <div className="projects-list">
+                  {projects.length === 0 ? (
+                    <div className="no-projects">
+                      No projects found. Create a project to get started.
                     </div>
+                  ) : (
+                    <ul className="project-list-items">
+                      {projects.map((project) => (
+                        <li key={project.id}>
+                          <div
+                            className={`project-list-item ${
+                              selectedProject === project.id ? "selected" : ""
+                            }`}
+                            onClick={() =>
+                              setSelectedProject(
+                                selectedProject === project.id ? "" : project.id
+                              )
+                            }
+                          >
+                            <div className="project-list-item-content">
+                              <div className="project-name">
+                                <Hammer
+                                  size={16}
+                                  style={{ marginRight: "8px", color: "#3b82f6" }}
+                                />
+                                {project.name}
+                              </div>
+                              <div className="project-address">
+                                <MapPin
+                                  size={16}
+                                  style={{ marginRight: "8px", color: "#64748b" }}
+                                />
+                                {project.jobSiteAddress}
+                              </div>
+                            </div>
+                          </div>
+                        </li>
+                      ))}
+                    </ul>
                   )}
                 </div>
               </div>
+
+              {/* Project Details Card (only shown when a project is selected) */}
+              {selectedProject && (
+                <div className="section">
+                  <div className="task-list-header">
+                    <h3 className="task-list-title">Project Details</h3>
+                  </div>
+                  <div className="task-list-content">
+                    {(() => {
+                      const project = projects.find((p) => p.id === selectedProject);
+                      if (!project) return <div>Project not found.</div>;
+
+                      const projectSubcontractors = subcontractors.filter((sub) =>
+                        project.subcontractorIds.includes(sub.id)
+                      );
+                      const projectSchedules = schedules.filter(
+                        (schedule) => schedule.projectId === project.id
+                      );
+
+                      return (
+                        <div className="project-details-content">
+                          <div className="project-details-section">
+                            <h4>
+                              <Hammer
+                                size={16}
+                                style={{ marginRight: "8px", color: "#3b82f6" }}
+                              />
+                              {project.name}
+                            </h4>
+                            <p>
+                              <MapPin
+                                size={16}
+                                style={{ marginRight: "8px", color: "#64748b" }}
+                              />
+                              {project.jobSiteAddress}
+                            </p>
+                          </div>
+
+                          <div className="project-details-section">
+                            <h4>Subcontractors</h4>
+                            {projectSubcontractors.length === 0 ? (
+                              <p>No subcontractors assigned.</p>
+                            ) : (
+                              <ul className="subcontractor-list">
+                                {projectSubcontractors.map((sub) => (
+                                  <li key={sub.id}>
+                                    <Users
+                                      size={16}
+                                      style={{ marginRight: "8px", color: "#64748b" }}
+                                    />
+                                    <strong>{sub.name}</strong> - {sub.role || "N/A"} (
+                                    {sub.phone})
+                                  </li>
+                                ))}
+                              </ul>
+                            )}
+                          </div>
+
+                          <div className="project-details-section">
+                            <h4>Schedules</h4>
+                            {projectSchedules.length === 0 ? (
+                              <p>No schedules set.</p>
+                            ) : (
+                              <ul className="schedule-list">
+                                {projectSchedules.map((schedule) => {
+                                  const sub = subcontractors.find(
+                                    (s) => s.id === schedule.subcontractorId
+                                  );
+                                  return (
+                                    <li key={schedule.id}>
+                                      <Calendar
+                                        size={16}
+                                        style={{ marginRight: "8px", color: "#64748b" }}
+                                      />
+                                      <strong>{sub?.name || "Unknown"}:</strong>{" "}
+                                      {new Date(schedule.date).toLocaleDateString()} at{" "}
+                                      {schedule.time} -{" "}
+                                      {schedule.confirmed ? "Confirmed" : "Pending"}
+                                    </li>
+                                  );
+                                })}
+                              </ul>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })()}
+                  </div>
+                </div>
+              )}
+
+              {/* Add Project Modal */}
+              {isAddProjectModalOpen && (
+                <div className="add-project-modal">
+                  <div className="add-project-modal-content">
+                    <div className="add-project-modal-header">
+                      <h3>Add New Project</h3>
+                      <button
+                        onClick={() => setIsAddProjectModalOpen(false)}
+                        className="close-modal-button"
+                      >
+                        <X size={20} />
+                      </button>
+                    </div>
+
+                    <form onSubmit={handleAddProject} className="add-project-form">
+                      <div className="form-group">
+                        <label htmlFor="project-name">Project Name</label>
+                        <input
+                          type="text"
+                          id="project-name"
+                          value={newProject.name}
+                          onChange={(e) =>
+                            setNewProject({ ...newProject, name: e.target.value })
+                          }
+                          placeholder="Enter project name"
+                          required
+                        />
+                      </div>
+
+                      <div className="form-group">
+                        <label htmlFor="job-site-address">Job Site Address</label>
+                        <input
+                          type="text"
+                          id="job-site-address"
+                          value={newProject.jobSiteAddress}
+                          onChange={(e) =>
+                            setNewProject({
+                              ...newProject,
+                              jobSiteAddress: e.target.value,
+                            })
+                          }
+                          placeholder="Enter job site address"
+                          required
+                        />
+                      </div>
+
+                      <div className="form-group">
+                        <label htmlFor="subcontractors">Subcontractors</label>
+                        <select
+                          id="subcontractors"
+                          multiple
+                          value={newProject.subcontractorIds}
+                          onChange={(e) =>
+                            setNewProject({
+                              ...newProject,
+                              subcontractorIds: Array.from(
+                                e.target.selectedOptions,
+                                (option) => option.value
+                              ),
+                            })
+                          }
+                        >
+                          {subcontractors.map((sub) => (
+                            <option key={sub.id} value={sub.id}>
+                              {sub.name} ({sub.role || "N/A"})
+                            </option>
+                          ))}
+                        </select>
+                        <small>Hold Ctrl (or Cmd on Mac) to select multiple subcontractors.</small>
+                      </div>
+
+                      {error && <p className="error-message">{error}</p>}
+
+                      <div className="add-project-modal-footer">
+                        <button
+                          type="button"
+                          onClick={() => setIsAddProjectModalOpen(false)}
+                          className="cancel-button"
+                        >
+                          Cancel
+                        </button>
+                        <button type="submit" className="save-project-button">
+                          <Save size={16} style={{ marginRight: "8px" }} />
+                          Save Project
+                        </button>
+                      </div>
+                    </form>
+                  </div>
+                </div>
+              )}
             </div>
           )}
 
