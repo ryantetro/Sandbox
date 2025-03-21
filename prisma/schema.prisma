@@ -22,7 +22,7 @@ model Subcontractor {
   id         String      @id @default(auto()) @map("_id") @db.ObjectId
   name       String
   phone      String
-  projects   String[]    @db.ObjectId
+  tasks      Task[]
   role       String?
   status     String      @default("Active")
   schedules  Schedule[]
@@ -33,11 +33,37 @@ model Project {
   id                 String               @id @default(auto()) @map("_id") @db.ObjectId
   name               String
   jobSiteAddress     String
-  subcontractorIds   String[]             @db.ObjectId
+  taskIds            String[]             @db.ObjectId
+  tasks              Task[]
   schedules          Schedule[]
   automatedMessages  AutomatedMessage[]
   userId            String?   
   user              User?    @relation(fields: [userId], references: [id])
+}
+
+enum TaskStatus {
+  pending
+  in_progress
+  completed
+}
+
+enum TaskPriority {
+  low
+  medium
+  high
+}
+
+model Task {
+  id                String          @id @default(auto()) @map("_id") @db.ObjectId
+  description       String
+  status            TaskStatus      @default(pending)
+  priority          TaskPriority?
+  startDate         DateTime?
+  endDate           DateTime?
+  projectId         String          @db.ObjectId
+  project           Project         @relation(fields: [projectId], references: [id])
+  subcontractorIds  String[]       @db.ObjectId
+  subcontractor     Subcontractor   @relation(fields: [subcontractorIds], references: [id])
 }
 
 model Schedule {

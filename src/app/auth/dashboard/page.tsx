@@ -9,6 +9,7 @@ import { FaProjectDiagram, FaTimes } from "react-icons/fa";
 import { Bell, Calendar, ChevronDown, ChevronUp, FileText, Home, LogOut, Menu, MessageSquare, Settings, User, X, FolderKanban, Kanban, Hammer, MapPin, Users, Plus, Save } from "lucide-react";
 import Link from "next/link";
 import "../styles/dashboard.css";
+import { DateTime } from "next-auth/providers/kakao";
 
 // Extend the Session type to include companyName and role
 declare module "next-auth" {
@@ -24,12 +25,27 @@ declare module "next-auth" {
   }
 }
 
+enum TaskStatus {
+  pending = "pending",
+  IN_PROGRESS = "IN_PROGRESS",
+  COMPLETED = "COMPLETED",
+}
+
+enum TaskPriority {
+  low = "low",
+  medium = "medium",
+  high = "high",
+}
+
 interface Task {
   id: string;
-  text: string;
-  completed: boolean;
-  dueDate?: string;
-  priority?: "low" | "medium" | "high";
+  description: string;
+  status: TaskStatus;
+  priority?: TaskPriority;
+  startDate?: DateTime;
+  endDate?: DateTime;
+  projectId: string;
+  subcontractorIds?: string[];
 }
 
 interface Subcontractor {
@@ -45,7 +61,7 @@ interface Project {
   id: string;
   name: string;
   jobSiteAddress: string;
-  subcontractorIds: string[];
+  taskIds: string[];
 }
 
 interface Schedule {
@@ -66,21 +82,23 @@ export default function Dashboard() {
   const { data: session, status } = useSession() as { data: Session & { user: ExtendedUser }; status: "loading" | "authenticated" | "unauthenticated" };
   const router = useRouter();
 
-  const initialTasks: Task[] = [
-    { id: 1, text: "Complete project report", completed: false, dueDate: "2025-03-25", priority: "high" },
-    { id: 2, text: "Call the client", completed: true, dueDate: "2025-03-18", priority: "medium" },
-    { id: 3, text: "Review marketing strategy", completed: false, dueDate: "2025-03-22", priority: "medium" },
-    { id: 4, text: "Update website content", completed: false, dueDate: "2025-03-28", priority: "low" },
-  ];
-
   const [selectedProject, setSelectedProject] = useState("");
   const [subcontractors, setSubcontractors] = useState<Subcontractor[]>([]);
   const [schedules, setSchedules] = useState<Schedule[]>([]);
   const [projects, setProjects] = useState<Project[]>([]);
-  const [tasks, setTasks] = useState<Task[]>(initialTasks);
+  const [tasks, setTasks] = useState<Task[]>([]);
   const [newTask, setNewTask] = useState("");
   const [newTaskDueDate, setNewTaskDueDate] = useState("");
-  const [newTaskPriority, setNewTaskPriority] = useState<"low" | "medium" | "high">("medium");
+  const [newTaskPriority, setNewTaskPriority] = useState<"low" | "medium" | "high">("low");
+  const [newTaskProjectId, setNewTaskProjectId] = useState(""); // New: Selected project ID
+  const [newTaskStartDate, setNewTaskStartDate] = useState(""); // New: Start date
+  const [newTaskSubcontractorIds, setNewTaskSubcontractorIds] = useState<string[]>([]); // New: Selected subcontractor IDs
+  const [isAddSubcontractorFormOpen, setIsAddSubcontractorFormOpen] = useState(false); // New: Toggle for adding a new subcontractor
+  const [newSubcontractor, setNewSubcontractor] = useState({
+    name: "",
+    role: "",
+    phone: "",
+  }); // New: Form data for adding a new subcontractor
   const [error, setError] = useState<string | null>(null);
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
   const [activeSection, setActiveSection] = useState("dashboard");
@@ -106,10 +124,11 @@ export default function Dashboard() {
     useEffect(() => {
       const fetchData = async () => {
         try {
-          const [subcontractorsRes, projectsRes, schedulesRes] = await Promise.all([
+          const [subcontractorsRes, projectsRes, schedulesRes, tasksRes] = await Promise.all([
             fetch("/api/subcontractors"),
             fetch("/api/projects"),
             fetch("/api/schedules"),
+            fetch("/api/tasks")
           ]);
   
           const errors: string[] = [];
@@ -125,6 +144,10 @@ export default function Dashboard() {
             const errorText = await schedulesRes.text();
             errors.push(`Schedules API failed: ${schedulesRes.status} ${schedulesRes.statusText} - ${errorText}`);
           }
+          if (!tasksRes.ok) {
+            const errorText = await schedulesRes.text();
+            errors.push(`Tasks API failed: ${tasksRes.status} ${tasksRes.statusText} - ${errorText}`);
+          }
   
           if (errors.length > 0) {
             console.error("API Errors:", errors);
@@ -134,10 +157,12 @@ export default function Dashboard() {
           const subcontractorsData = await subcontractorsRes.json();
           const projectsData = await projectsRes.json();
           const schedulesData = await schedulesRes.json();
+          const tasksData = await tasksRes.json();
   
           setSubcontractors(subcontractorsData);
           setProjects(projectsData);
           setSchedules(schedulesData);
+          setTasks(tasksData)
         } catch (error) {
           console.error("Error fetching data:", error);
           setError(error instanceof Error ? error.message : "Failed to load data. Please try again later.");
@@ -158,36 +183,106 @@ export default function Dashboard() {
   }
 
   // Handle adding a new task
-  const handleAddTask = () => {
-    if (newTask.trim() === "") {
-      setError("Task description cannot be empty.");
+  const handleAddTask = async () => {
+    if (!newTaskProjectId) {
+      setError("Please select a project for the task.");
       return;
     }
+  
+    if (!newTask.trim()) {
+      setError("Task description is required.");
+      return;
+    }
+  
+    try {
+      const response = await fetch("/api/tasks", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          description: newTask,
+          status: "pending", // Matches the TaskStatus enum in the database
+          priority: newTaskPriority || undefined,
+          startDate: newTaskStartDate ? new Date(newTaskStartDate).toISOString() : undefined,
+          endDate: newTaskDueDate ? new Date(newTaskDueDate).toISOString() : undefined,
+          projectId: newTaskProjectId,
+          subcontractorIds: newTaskSubcontractorIds,
+          createdBy: session?.user?.id, // Include the userId from the session
+        }),
+        credentials: "include", // Include cookies for authentication
+      });
+  
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(`Failed to create task: ${response.status} ${response.statusText} - ${errorText}`);
+      }
+  
+      const createdTask = await response.json();
+      setTasks([...tasks, createdTask]); // Add the new task to the state
+      // Reset the form
+      setNewTask("");
+      setNewTaskDueDate("");
+      setNewTaskPriority("medium");
+      setNewTaskProjectId("");
+      setNewTaskStartDate("");
+      setNewTaskSubcontractorIds([]);
+      setError(null); // Clear any previous errors
+    } catch (err) {
+      console.error("Error creating task:", err);
+      setError(err instanceof Error ? err.message : "Failed to create task. Please try again.");
+    }
+  };
 
-    setTasks([
-      ...tasks,
-      {
-        id: tasks.length + 1,
-        text: newTask,
-        completed: false,
-        dueDate: newTaskDueDate || undefined,
-        priority: newTaskPriority,
-      },
-    ]);
-    setNewTask("");
-    setNewTaskDueDate("");
-    setError(null);
+  const handleAddSubcontractor = async (e: React.FormEvent) => {
+    e.preventDefault();
+  
+    if (!newSubcontractor.name.trim()) {
+      setError("Subcontractor name is required.");
+      return;
+    }
+  
+    try {
+      const response = await fetch("/api/subcontractors", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          name: newSubcontractor.name,
+          role: newSubcontractor.role || undefined,
+          phone: newSubcontractor.phone || undefined,
+          userId: session?.user?.id, // Include the userId from the session
+        }),
+        credentials: "include", // Include cookies for authentication
+      });
+  
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(`Failed to create subcontractor: ${response.status} ${response.statusText} - ${errorText}`);
+      }
+  
+      const createdSubcontractor = await response.json();
+      setSubcontractors([...subcontractors, createdSubcontractor]); // Add the new subcontractor to the state
+      setNewTaskSubcontractorIds([...newTaskSubcontractorIds, createdSubcontractor.id]); // Automatically select the new subcontractor
+      setNewSubcontractor({ name: "", role: "", phone: "" }); // Reset the form
+      setIsAddSubcontractorFormOpen(false); // Close the form
+      setError(null); // Clear any previous errors
+    } catch (err) {
+      console.error("Error creating subcontractor:", err);
+      setError(err instanceof Error ? err.message : "Failed to create subcontractor. Please try again.");
+    }
   };
 
   // Handle task completion toggle
-  const handleTaskCompletion = (taskId: number) => {
+  const handleTaskCompletion = (taskId: string) => {
     setTasks(tasks.map((task) =>
-      task.id === taskId ? { ...task, completed: !task.completed } : task
+      task.id === taskId ? { ...task, status: task.status !== TaskStatus.COMPLETED ? TaskStatus.COMPLETED : TaskStatus.pending } : task
     ));
   };
 
   // Handle deleting a task
-  const handleDeleteTask = (taskId: number) => {
+  const handleDeleteTask = (taskId: string) => {
     setTasks(tasks.filter((task) => task.id !== taskId));
   };
 
@@ -256,9 +351,13 @@ export default function Dashboard() {
   };
 
   // Get tasks count by status
-  const completedTasks = tasks.filter((task) => task.completed).length;
-  const pendingTasks = tasks.filter((task) => !task.completed).length;
-  const overdueTasks = tasks.filter((task) => !task.completed && isOverdue(task.dueDate)).length;
+  const completedTasks = tasks.filter((task) => task.status === "COMPLETED").length;
+  const pendingTasks = tasks.filter((task) => task.status != "COMPLETED").length;
+  const overdueTasks = tasks.filter((task) => task.status != "COMPLETED" && isOverdue(task.endDate)).length;
+
+  const currentTasks = tasks.filter((task) => task.startDate && new Date(task.startDate) <= new Date());
+  const upcomingTasks = tasks.filter((task) => task.startDate && new Date(task.startDate) > new Date());
+  const needsScheduling = tasks.filter((task) => !task.startDate);
 
   // Calculate progress percentage for the progress bar
   const progressPercentage = tasks.length > 0 ? (completedTasks / tasks.length) * 100 : 0;
@@ -456,24 +555,24 @@ export default function Dashboard() {
 
               <div className="section">
                 <div className="section-header">
-                  <h3 className="section-title">Recent Tasks</h3>
+                  <h3 className="section-title">Current Tasks</h3>
                 </div>
                 <div className="section-content">
                   <ul className="task-list">
-                    {tasks.slice(0, 3).map((task) => (
+                    {currentTasks.slice(0, 3).map((task) => (
                       <li key={task.id} className="task-item">
                         <div style={{ display: "flex", alignItems: "center" }}>
                           <input
                             type="checkbox"
-                            checked={task.completed}
+                            checked={task.status === "COMPLETED"}
                             onChange={() => handleTaskCompletion(task.id)}
                           />
                           {/* Add Priority Dot */}
                           {task.priority && (
                             <span className={`priority-dot ${task.priority}`}></span>
                           )}
-                          <span className={`task-text ${task.completed ? "completed" : ""}`}>
-                            {task.text}
+                          <span className={`task-text ${task.status === "COMPLETED" ? "completed" : ""}`}>
+                            {task.description}
                           </span>
                           {task.priority && (
                             <span className={getPriorityClass(task.priority)}>
@@ -481,9 +580,111 @@ export default function Dashboard() {
                             </span>
                           )}
                         </div>
-                        {task.dueDate && (
-                          <span className={`task-due-date ${isOverdue(task.dueDate) && !task.completed ? "overdue" : ""}`}>
-                            Due: {new Date(task.dueDate).toLocaleDateString()}
+                        {task.endDate && (
+                          <span className={`task-due-date ${isOverdue(task.endDate) && task.status != "COMPLETED" ? "overdue" : ""}`}>
+                            Due: {new Date(task.endDate).toLocaleDateString()}
+                          </span>
+                        )}
+                        {!task.endDate && (
+                          <span className="task-due-date">
+                            No Scheduled Due Date
+                          </span>
+                        )}
+                      </li>
+                    ))}
+                  </ul>
+                  {tasks.length > 3 && (
+                    <button
+                      onClick={() => setActiveSection("tasks")}
+                      className="view-all-button"
+                    >
+                      View all tasks
+                    </button>
+                  )}
+                </div>
+              </div>
+
+              <div className="section">
+                <div className="section-header">
+                  <h3 className="section-title">Upcoming Tasks</h3>
+                </div>
+                <div className="section-content">
+                  <ul className="task-list">
+                    {upcomingTasks.slice(0, 3).map((task) => (
+                      <li key={task.id} className="task-item">
+                        <div style={{ display: "flex", alignItems: "center" }}>
+                          <input
+                            type="checkbox"
+                            checked={task.status === "COMPLETED"}
+                            onChange={() => handleTaskCompletion(task.id)}
+                          />
+                          {/* Add Priority Dot */}
+                          {task.priority && (
+                            <span className={`priority-dot ${task.priority}`}></span>
+                          )}
+                          <span className={`task-text ${task.status === "COMPLETED" ? "completed" : ""}`}>
+                            {task.description}
+                          </span>
+                          {task.priority && (
+                            <span className={getPriorityClass(task.priority)}>
+                              {task.priority}
+                            </span>
+                          )}
+                        </div>
+                        {task.startDate && (
+                          <span className={`task-due-date ${isOverdue(task.startDate) && task.status != "COMPLETED" ? "overdue" : ""}`}>
+                            Scheduled Start Date: {new Date(task.startDate).toLocaleDateString()}
+                          </span>
+                        )}
+                      </li>
+                    ))}
+                  </ul>
+                  {tasks.length > 3 && (
+                    <button
+                      onClick={() => setActiveSection("tasks")}
+                      className="view-all-button"
+                    >
+                      View all tasks
+                    </button>
+                  )}
+                </div>
+              </div>
+
+              <div className="section">
+                <div className="section-header">
+                  <h3 className="section-title">Needs Scheduling</h3>
+                </div>
+                <div className="section-content">
+                  <ul className="task-list">
+                    {needsScheduling.slice(0, 3).map((task) => (
+                      <li key={task.id} className="task-item">
+                        <div style={{ display: "flex", alignItems: "center" }}>
+                          <input
+                            type="checkbox"
+                            checked={task.status === "COMPLETED"}
+                            onChange={() => handleTaskCompletion(task.id)}
+                          />
+                          {/* Add Priority Dot */}
+                          {task.priority && (
+                            <span className={`priority-dot ${task.priority}`}></span>
+                          )}
+                          <span className={`task-text ${task.status === "COMPLETED" ? "completed" : ""}`}>
+                            {task.description}
+                          </span>
+                          {task.priority && (
+                            <span className={getPriorityClass(task.priority)}>
+                              {task.priority}
+                            </span>
+                          )}
+                        </div>
+                        {task.startDate && (
+                          <span className={`task-due-date ${isOverdue(task.startDate) && task.status != "COMPLETED" ? "overdue" : ""}`}>
+                            Scheduled Start Date: {new Date(task.startDate).toLocaleDateString()}
+                          </span>
+                        )}
+                        {!task.startDate && (
+                          <span className="task-due-date">
+                            No Scheduled Start Date
                           </span>
                         )}
                       </li>
@@ -595,8 +796,8 @@ export default function Dashboard() {
                       const project = projects.find((p) => p.id === selectedProject);
                       if (!project) return <div>Project not found.</div>;
 
-                      const projectSubcontractors = subcontractors.filter((sub) =>
-                        project.subcontractorIds.includes(sub.id)
+                      const projectTasks = tasks.filter((task) =>
+                        project.taskIds.includes(task.id)
                       );
                       const projectSchedules = schedules.filter(
                         (schedule) => schedule.projectId === project.id
@@ -622,48 +823,20 @@ export default function Dashboard() {
                           </div>
 
                           <div className="project-details-section">
-                            <h4>Subcontractors</h4>
-                            {projectSubcontractors.length === 0 ? (
+                            <h4>Tasks</h4>
+                            {projectTasks.length === 0 ? (
                               <p>No subcontractors assigned.</p>
                             ) : (
                               <ul className="subcontractor-list">
-                                {projectSubcontractors.map((sub) => (
-                                  <li key={sub.id}>
-                                    <Users
+                                {projectTasks.map((task) => (
+                                  <li key={task.id}>
+                                    <FaProjectDiagram
                                       size={16}
                                       style={{ marginRight: "8px", color: "#64748b" }}
                                     />
-                                    <strong>{sub.name}</strong> - {sub.role || "N/A"} (
-                                    {sub.phone})
+                                    <strong>{task.description}</strong>
                                   </li>
                                 ))}
-                              </ul>
-                            )}
-                          </div>
-
-                          <div className="project-details-section">
-                            <h4>Schedules</h4>
-                            {projectSchedules.length === 0 ? (
-                              <p>No schedules set.</p>
-                            ) : (
-                              <ul className="schedule-list">
-                                {projectSchedules.map((schedule) => {
-                                  const sub = subcontractors.find(
-                                    (s) => s.id === schedule.subcontractorId
-                                  );
-                                  return (
-                                    <li key={schedule.id}>
-                                      <Calendar
-                                        size={16}
-                                        style={{ marginRight: "8px", color: "#64748b" }}
-                                      />
-                                      <strong>{sub?.name || "Unknown"}:</strong>{" "}
-                                      {new Date(schedule.date).toLocaleDateString()} at{" "}
-                                      {schedule.time} -{" "}
-                                      {schedule.confirmed ? "Confirmed" : "Pending"}
-                                    </li>
-                                  );
-                                })}
                               </ul>
                             )}
                           </div>
@@ -774,48 +947,172 @@ export default function Dashboard() {
                 <h3 className="add-task-title">Add New Task</h3>
 
                 <div className="add-task-grid">
-                  <div>
+                  {/* Project Selection (Required) */}
+                  <div className="form-group">
+                    <label htmlFor="task-project">Project</label>
+                    <select
+                      id="task-project"
+                      value={newTaskProjectId}
+                      onChange={(e) => setNewTaskProjectId(e.target.value)}
+                      className="add-task-input"
+                      required
+                    >
+                      <option value="">Select a project</option>
+                      {projects.map((project) => (
+                        <option key={project.id} value={project.id}>
+                          {project.name}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  {/* Description (Required) */}
+                  <div className="form-group">
+                    <label htmlFor="task-description">Description</label>
                     <input
                       type="text"
+                      id="task-description"
                       value={newTask}
                       onChange={(e) => setNewTask(e.target.value)}
                       placeholder="What needs to be done?"
                       className="add-task-input"
+                      required
                     />
                   </div>
 
-                  <div>
+                  {/* Start Date (Optional) */}
+                  <div className="form-group">
+                    <label htmlFor="task-start-date">Start Date</label>
                     <input
                       type="date"
+                      id="task-start-date"
+                      value={newTaskStartDate}
+                      onChange={(e) => setNewTaskStartDate(e.target.value)}
+                      className="add-task-input"
+                    />
+                  </div>
+
+                  {/* Due Date (Optional) */}
+                  <div className="form-group">
+                    <label htmlFor="task-due-date">Due Date</label>
+                    <input
+                      type="date"
+                      id="task-due-date"
                       value={newTaskDueDate}
                       onChange={(e) => setNewTaskDueDate(e.target.value)}
                       className="add-task-input"
                     />
                   </div>
-                </div>
 
-                <div className="add-task-footer">
-                  <div style={{ display: "flex", alignItems: "center", gap: "1rem" }}>
-                    <label className="priority-label">
-                      <span>Priority:</span>
-                      <select
-                        value={newTaskPriority}
-                        onChange={(e) =>
-                          setNewTaskPriority(e.target.value as "low" | "medium" | "high")
-                        }
-                        className="priority-select"
-                      >
-                        <option value="low">Low</option>
-                        <option value="medium">Medium</option>
-                        <option value="high">High</option>
-                      </select>
-                    </label>
+                  {/* Priority (Optional) */}
+                  <div className="form-group">
+                    <label htmlFor="task-priority">Priority</label>
+                    <select
+                      id="task-priority"
+                      value={newTaskPriority}
+                      onChange={(e) =>
+                        setNewTaskPriority(e.target.value as "low" | "medium" | "high")
+                      }
+                      className="add-task-input"
+                    >
+                      <option value="">None</option>
+                      <option value="low">Low</option>
+                      <option value="medium">Medium</option>
+                      <option value="high">High</option>
+                    </select>
                   </div>
 
-                  <button
-                    onClick={handleAddTask}
-                    className="add-task-button"
-                  >
+                  {/* Subcontractors (Optional) */}
+                  <div className="form-group">
+                    <label htmlFor="task-subcontractors">Subcontractors</label>
+                    <select
+                      id="task-subcontractors"
+                      multiple
+                      value={newTaskSubcontractorIds}
+                      onChange={(e) =>
+                        setNewTaskSubcontractorIds(
+                          Array.from(e.target.selectedOptions, (option) => option.value)
+                        )
+                      }
+                      className="add-task-input"
+                    >
+                      {subcontractors.map((sub) => (
+                        <option key={sub.id} value={sub.id}>
+                          {sub.name} ({sub.role || "N/A"})
+                        </option>
+                      ))}
+                    </select>
+                    <small>Hold Ctrl (or Cmd on Mac) to select multiple subcontractors.</small>
+                    <button
+                      type="button"
+                      onClick={() => setIsAddSubcontractorFormOpen(true)}
+                      className="add-subcontractor-button"
+                    >
+                      Add New Subcontractor
+                    </button>
+                  </div>
+                </div>
+
+                {/* Add New Subcontractor Form (Inline) */}
+                {isAddSubcontractorFormOpen && (
+                  <div className="add-subcontractor-form">
+                    <h4>Add New Subcontractor</h4>
+                    <form onSubmit={handleAddSubcontractor}>
+                      <div className="form-group">
+                        <label htmlFor="subcontractor-name">Name</label>
+                        <input
+                          type="text"
+                          id="subcontractor-name"
+                          value={newSubcontractor.name}
+                          onChange={(e) =>
+                            setNewSubcontractor({ ...newSubcontractor, name: e.target.value })
+                          }
+                          placeholder="Enter subcontractor name"
+                          required
+                        />
+                      </div>
+                      <div className="form-group">
+                        <label htmlFor="subcontractor-role">Role</label>
+                        <input
+                          type="text"
+                          id="subcontractor-role"
+                          value={newSubcontractor.role}
+                          onChange={(e) =>
+                            setNewSubcontractor({ ...newSubcontractor, role: e.target.value })
+                          }
+                          placeholder="Enter role (optional)"
+                        />
+                      </div>
+                      <div className="form-group">
+                        <label htmlFor="subcontractor-phone">Phone</label>
+                        <input
+                          type="text"
+                          id="subcontractor-phone"
+                          value={newSubcontractor.phone}
+                          onChange={(e) =>
+                            setNewSubcontractor({ ...newSubcontractor, phone: e.target.value })
+                          }
+                          placeholder="Enter phone number (optional)"
+                        />
+                      </div>
+                      <div className="add-subcontractor-footer">
+                        <button
+                          type="button"
+                          onClick={() => setIsAddSubcontractorFormOpen(false)}
+                          className="cancel-button"
+                        >
+                          Cancel
+                        </button>
+                        <button type="submit" className="save-subcontractor-button">
+                          Save Subcontractor
+                        </button>
+                      </div>
+                    </form>
+                  </div>
+                )}
+
+                <div className="add-task-footer">
+                  <button onClick={handleAddTask} className="add-task-button">
                     Add Task
                   </button>
                 </div>
@@ -838,11 +1135,11 @@ export default function Dashboard() {
                         <div className="task-item-details">
                           <input
                             type="checkbox"
-                            checked={task.completed}
+                            checked={task.status === "COMPLETED"}
                             onChange={() => handleTaskCompletion(task.id)}
                           />
-                          <span className={`task-text ${task.completed ? "completed" : ""}`}>
-                            {task.text}
+                          <span className={`task-text ${task.status === "COMPLETED" ? "completed" : ""}`}>
+                            {task.description}
                           </span>
                           {task.priority && (
                             <span className={`task-priority-tag ${task.priority}`}>
@@ -852,10 +1149,10 @@ export default function Dashboard() {
                         </div>
 
                         <div className="task-actions">
-                          {task.dueDate && (
-                            <span className={`task-due-date ${isOverdue(task.dueDate) && !task.completed ? "overdue" : ""}`}>
-                              {isOverdue(task.dueDate) && !task.completed ? "Overdue: " : "Due: "}
-                              {new Date(task.dueDate).toLocaleDateString()}
+                          {task.endDate && (
+                            <span className={`task-due-date ${isOverdue(task.endDate) && task.status != "COMPLETED" ? "overdue" : ""}`}>
+                              {isOverdue(task.endDate) && task.status != "COMPLETED" ? "Overdue: " : "Due: "}
+                              {new Date(task.endDate).toLocaleDateString()}
                             </span>
                           )}
 
