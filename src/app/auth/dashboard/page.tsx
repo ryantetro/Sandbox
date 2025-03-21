@@ -6,10 +6,24 @@ import { useSession, signOut } from "next-auth/react";
 import { Session } from "next-auth";
 import { useRouter } from "next/navigation";
 import { FaProjectDiagram, FaTimes } from "react-icons/fa";
-import { Bell, Calendar, ChevronDown, ChevronUp, FileText, Home, LogOut, Menu, MessageSquare, Settings, User, X, FolderKanban, Kanban, Hammer, MapPin, Users, Plus, Save } from "lucide-react";
+import { Bell, Calendar, ChevronDown, ChevronUp, FileText, Home, LogOut, Menu, MessageSquare, Settings, User, X, FolderKanban, Kanban, Hammer, MapPin, Users, Plus, Save, Clock, AlertTriangle, CheckCircle } from "lucide-react";
 import Link from "next/link";
 import "../styles/dashboard.css";
 import { DateTime } from "next-auth/providers/kakao";
+import { Calendar as BigCalendar, dateFnsLocalizer } from "react-big-calendar"
+import { format, parse, startOfWeek, getDay } from "date-fns"
+import { enUS } from "date-fns/locale/en-US"
+
+// Setup date-fns localizer for react-big-calendar
+const locales = { "en-US": enUS };
+const localizer = dateFnsLocalizer({
+  format,
+  parse,
+  startOfWeek: () => startOfWeek(new Date(), { weekStartsOn: 1 }),
+  getDay,
+  locales,
+});
+
 
 // Extend the Session type to include companyName and role
 declare module "next-auth" {
@@ -27,8 +41,8 @@ declare module "next-auth" {
 
 enum TaskStatus {
   pending = "pending",
-  IN_PROGRESS = "IN_PROGRESS",
-  COMPLETED = "COMPLETED",
+  in_progress = "in_progress",
+  completed = "completed",
 }
 
 enum TaskPriority {
@@ -82,6 +96,7 @@ export default function Dashboard() {
   const { data: session, status } = useSession() as { data: Session & { user: ExtendedUser }; status: "loading" | "authenticated" | "unauthenticated" };
   const router = useRouter();
 
+  const [calendarProjectFilter, setCalendarProjectFilter] = useState("all");
   const [selectedProject, setSelectedProject] = useState("");
   const [subcontractors, setSubcontractors] = useState<Subcontractor[]>([]);
   const [schedules, setSchedules] = useState<Schedule[]>([]);
@@ -185,7 +200,7 @@ export default function Dashboard() {
           setSubcontractors(subcontractorsData);
           setProjects(projectsData);
           setSchedules(schedulesData);
-          setTasks(tasksData)
+          setTasks(tasksData);
         } catch (error) {
           console.error("Error fetching data:", error);
           setError(error instanceof Error ? error.message : "Failed to load data. Please try again later.");
@@ -300,7 +315,7 @@ export default function Dashboard() {
   // Handle task completion toggle
   const handleTaskCompletion = (taskId: string) => {
     setTasks(tasks.map((task) =>
-      task.id === taskId ? { ...task, status: task.status !== TaskStatus.COMPLETED ? TaskStatus.COMPLETED : TaskStatus.pending } : task
+      task.id === taskId ? { ...task, status: task.status !== TaskStatus.completed ? TaskStatus.completed : TaskStatus.pending } : task
     ));
   };
 
@@ -420,9 +435,9 @@ export default function Dashboard() {
   };
 
   // Get tasks count by status
-  const completedTasks = tasks.filter((task) => task.status === "COMPLETED").length;
-  const pendingTasks = tasks.filter((task) => task.status != "COMPLETED").length;
-  const overdueTasks = tasks.filter((task) => task.status != "COMPLETED" && isOverdue(task.endDate)).length;
+  const completedTasks = tasks.filter((task) => task.status === "completed").length;
+  const pendingTasks = tasks.filter((task) => task.status != "completed").length;
+  const overdueTasks = tasks.filter((task) => task.status != "completed" && isOverdue(task.endDate)).length;
 
   const currentTasks = tasks.filter((task) => task.startDate && new Date(task.startDate) <= new Date());
   const upcomingTasks = tasks.filter((task) => task.startDate && new Date(task.startDate) > new Date());
@@ -430,6 +445,89 @@ export default function Dashboard() {
 
   // Calculate progress percentage for the progress bar
   const progressPercentage = tasks.length > 0 ? (completedTasks / tasks.length) * 100 : 0;
+
+  // Calendar Events: Combine tasks and schedules
+  const calendarEvents = [
+      // Tasks as events
+      ...tasks
+        .filter((task) => {
+          if (calendarProjectFilter === "all") return true;
+          return task.projectId === calendarProjectFilter;
+        })
+        .filter((task) => task.startDate && task.endDate) // Only include tasks with start and end dates
+        .map((task) => {
+          const start = new Date(task.startDate!);
+          const end = new Date(task.endDate!);
+          // Ensure dates are valid
+          if (isNaN(start.getTime()) || isNaN(end.getTime())) {
+            console.warn(`Invalid dates for task ${task.id}:`, task.startDate, task.endDate);
+            return null;
+          }
+          return {
+            id: `task-${task.id}`,
+            title: `Task: ${task.description} (${projects.find((p) => p.id === task.projectId)?.name || "Unknown"})`,
+            start,
+            end,
+            allDay: false,
+            resource: {
+              type: "task",
+              priority: task.priority,
+              status: task.status,
+            },
+          };
+        })
+        .filter((event) => event !== null), // Remove invalid events
+      // Schedules as events
+      ...schedules
+        .filter((schedule) => {
+          if (calendarProjectFilter === "all") return true;
+          return schedule.projectId === calendarProjectFilter;
+        })
+        .map((schedule) => {
+          const subcontractor = subcontractors.find((sub) => sub.id === schedule.subcontractorId);
+          const project = projects.find((proj) => proj.id === schedule.projectId);
+          const dateTimeStr = `${schedule.date} ${schedule.time}`;
+          const eventDate = new Date(dateTimeStr);
+          if (isNaN(eventDate.getTime())) {
+            console.warn(`Invalid date for schedule ${schedule.id}:`, dateTimeStr);
+            return null;
+          }
+          return {
+            id: `schedule-${schedule.id}`,
+            title: `Schedule: ${subcontractor?.name || "Unknown"} @ ${project?.name || "Unknown"}`,
+            start: eventDate,
+            end: eventDate, // Schedules are point-in-time events
+            allDay: false,
+            resource: {
+              type: "schedule",
+              confirmed: schedule.confirmed,
+            },
+          };
+        })
+        .filter((event) => event !== null), // Remove invalid events
+    ];
+  
+    // Log events for debugging
+    console.log("Calendar Events:", calendarEvents);
+  
+    // Analytics for Calendar Section
+    const filteredTasks = tasks.filter((task) => {
+      if (calendarProjectFilter === "all") return true;
+      return task.projectId === calendarProjectFilter;
+    });
+  
+    const filteredUpcomingTasks = filteredTasks.filter((task) => {
+      if (!task.endDate) return false;
+      const due = new Date(task.endDate);
+      const now = new Date();
+      const diff = due.getTime() - now.getTime();
+      return diff > 0 && diff <= 7 * 24 * 60 * 60 * 1000; // Within 7 days
+    }).length;
+  
+    const filteredOverdueTasks = filteredTasks.filter((task) => task.status !== "completed" && isOverdue(task.endDate)).length;
+  
+    const filteredCompletedTasks = filteredTasks.filter((task) => task.status === "completed").length;
+    const completionPercentage = filteredTasks.length > 0 ? (filteredCompletedTasks / filteredTasks.length) * 100 : 0;
 
   return (
     <div className="dashboard-container">
@@ -633,14 +731,14 @@ export default function Dashboard() {
                         <div style={{ display: "flex", alignItems: "center" }}>
                           <input
                             type="checkbox"
-                            checked={task.status === "COMPLETED"}
+                            checked={task.status === "completed"}
                             onChange={() => handleTaskCompletion(task.id)}
                           />
                           {/* Add Priority Dot */}
                           {task.priority && (
                             <span className={`priority-dot ${task.priority}`}></span>
                           )}
-                          <span className={`task-text ${task.status === "COMPLETED" ? "completed" : ""}`}>
+                          <span className={`task-text ${task.status === "completed" ? "completed" : ""}`}>
                             {task.description}
                           </span>
                           {task.priority && (
@@ -650,7 +748,7 @@ export default function Dashboard() {
                           )}
                         </div>
                         {task.startDate ? (
-                          <span className={`task-due-date ${isOverdue(task.startDate) && task.status !== "COMPLETED" ? "overdue" : ""}`}>
+                          <span className={`task-due-date ${isOverdue(task.startDate) && task.status !== "completed" ? "overdue" : ""}`}>
                             Scheduled Start Date: {new Date(task.startDate).toLocaleDateString()}
                           </span>
                         ) : (
@@ -807,14 +905,14 @@ export default function Dashboard() {
                         <div style={{ display: "flex", alignItems: "center" }}>
                           <input
                             type="checkbox"
-                            checked={task.status === "COMPLETED"}
+                            checked={task.status === "completed"}
                             onChange={() => handleTaskCompletion(task.id)}
                           />
                           {/* Add Priority Dot */}
                           {task.priority && (
                             <span className={`priority-dot ${task.priority}`}></span>
                           )}
-                          <span className={`task-text ${task.status === "COMPLETED" ? "completed" : ""}`}>
+                          <span className={`task-text ${task.status === "completed" ? "completed" : ""}`}>
                             {task.description}
                           </span>
                           {task.priority && (
@@ -824,7 +922,7 @@ export default function Dashboard() {
                           )}
                         </div>
                         {task.endDate && (
-                          <span className={`task-due-date ${isOverdue(task.endDate) && task.status != "COMPLETED" ? "overdue" : ""}`}>
+                          <span className={`task-due-date ${isOverdue(task.endDate) && task.status != "completed" ? "overdue" : ""}`}>
                             Due: {new Date(task.endDate).toLocaleDateString()}
                           </span>
                         )}
@@ -858,14 +956,14 @@ export default function Dashboard() {
                         <div style={{ display: "flex", alignItems: "center" }}>
                           <input
                             type="checkbox"
-                            checked={task.status === "COMPLETED"}
+                            checked={task.status === "completed"}
                             onChange={() => handleTaskCompletion(task.id)}
                           />
                           {/* Add Priority Dot */}
                           {task.priority && (
                             <span className={`priority-dot ${task.priority}`}></span>
                           )}
-                          <span className={`task-text ${task.status === "COMPLETED" ? "completed" : ""}`}>
+                          <span className={`task-text ${task.status === "completed" ? "completed" : ""}`}>
                             {task.description}
                           </span>
                           {task.priority && (
@@ -875,7 +973,7 @@ export default function Dashboard() {
                           )}
                         </div>
                         {task.startDate && (
-                          <span className={`task-due-date ${isOverdue(task.startDate) && task.status != "COMPLETED" ? "overdue" : ""}`}>
+                          <span className={`task-due-date ${isOverdue(task.startDate) && task.status != "completed" ? "overdue" : ""}`}>
                             Scheduled Start Date: {new Date(task.startDate).toLocaleDateString()}
                           </span>
                         )}
@@ -1327,10 +1425,10 @@ export default function Dashboard() {
                         <div className="task-item-details">
                           <input
                             type="checkbox"
-                            checked={task.status === "COMPLETED"}
+                            checked={task.status === "completed"}
                             onChange={() => handleTaskCompletion(task.id)}
                           />
-                          <span className={`task-text ${task.status === "COMPLETED" ? "completed" : ""}`}>
+                          <span className={`task-text ${task.status === "completed" ? "completed" : ""}`}>
                             {task.description}
                           </span>
                           {task.priority && (
@@ -1342,8 +1440,8 @@ export default function Dashboard() {
 
                         <div className="task-actions">
                           {task.endDate && (
-                            <span className={`task-due-date ${isOverdue(task.endDate) && task.status != "COMPLETED" ? "overdue" : ""}`}>
-                              {isOverdue(task.endDate) && task.status != "COMPLETED" ? "Overdue: " : "Due: "}
+                            <span className={`task-due-date ${isOverdue(task.endDate) && task.status != "completed" ? "overdue" : ""}`}>
+                              {isOverdue(task.endDate) && task.status != "completed" ? "Overdue: " : "Due: "}
                               {new Date(task.endDate).toLocaleDateString()}
                             </span>
                           )}
@@ -1369,11 +1467,107 @@ export default function Dashboard() {
             </div>
           )}
 
-          {/* Calendar Section - Placeholder */}
+          {/* Calendar Section */}
           {activeSection === "calendar" && (
-            <div className="section calendar-placeholder">
-              <h3 className="calendar-title">Calendar</h3>
-              <p className="calendar-message">Calendar view would be implemented here.</p>
+            <div style={{ display: "flex", flexDirection: "column", gap: "1.5rem" }}>
+              <div className="section calendar-section">
+                <div className="section-header">
+                  <h3 className="section-title">Calendar</h3>
+                </div>
+                <div className="section-content">
+                  {/* Project Filter */}
+                  <div className="calendar-filter">
+                    <label htmlFor="calendar-project-filter" className="calendar-filter-label">
+                      Filter by Project:
+                    </label>
+                    <select
+                      id="calendar-project-filter"
+                      value={calendarProjectFilter}
+                      onChange={(e) => setCalendarProjectFilter(e.target.value)}
+                      className="calendar-filter-select"
+                    >
+                      <option value="all">All Projects</option>
+                      {projects.map((project) => (
+                        <option key={project.id} value={project.id}>
+                          {project.name}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  {/* Calendar */}
+                  <BigCalendar
+                    localizer={localizer}
+                    events={calendarEvents}
+                    startAccessor="start"
+                    endAccessor="end"
+                    defaultView="month"
+                    views={["month", "week", "day"]}
+                    style={{ height: 600, marginTop: "1rem" }}
+                    eventPropGetter={(event) => ({
+                      className: `rbc-event ${
+                        event.resource.type === "task"
+                          ? ("priority" in event.resource ? event.resource.priority || "medium" : "") +
+                            " " +
+                            (event.resource.status === "completed" ? "completed" : "")
+                          : event.resource.type === "schedule"
+                          ? event.resource.confirmed
+                            ? "schedule-confirmed"
+                            : "schedule-pending"
+                          : ""
+                      }`,
+                    })}
+                    components={{
+                      event: (props) => {
+                        const { event } = props;
+                        return (
+                          <div className="rbc-event-content" title={event.title}>
+                            {event.title}
+                          </div>
+                        );
+                      },
+                    }}
+                    onSelectEvent={(event) => {
+                      if (event.resource.type === "task") {
+                        const taskId = event.id.replace("task-", "");
+                        const currentStatus = tasks.find((t) => t.id === taskId)?.status;
+                        const newStatus =
+                          currentStatus === "completed" ? "in_progress" : "completed";
+                        setTasks(
+                          tasks.map((task) =>
+                            task.id === taskId ? { ...task, status: newStatus } : task
+                          )
+                        );
+                      }
+                    }}
+                  />
+
+                  {/* Analytics Section */}
+                  <div className="analytics-grid">
+                    <div className="analytics-card">
+                      <Clock className="analytics-icon" />
+                      <div>
+                        <p className="analytics-value">{filteredUpcomingTasks}</p>
+                        <p className="analytics-label">Upcoming Tasks (Next 7 Days)</p>
+                      </div>
+                    </div>
+                    <div className="analytics-card">
+                      <AlertTriangle className="analytics-icon" />
+                      <div>
+                        <p className="analytics-value">{filteredOverdueTasks}</p>
+                        <p className="analytics-label">Overdue Tasks</p>
+                      </div>
+                    </div>
+                    <div className="analytics-card">
+                      <CheckCircle className="analytics-icon" />
+                      <div>
+                        <p className="analytics-value">{Math.round(completionPercentage)}%</p>
+                        <p className="analytics-label">Completion Rate</p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
             </div>
           )}
 

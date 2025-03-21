@@ -10,6 +10,7 @@ import { Bell, Calendar, ChevronDown, FileText, FolderKanban, Home, LogOut, Menu
 import { FaProjectDiagram, FaTimes } from "react-icons/fa";
 import Link from "next/link";
 import "../../styles/dashboard.css";
+import { DateTime } from "next-auth/providers/kakao";
 
 // Extend the Session type to include companyName and role
 declare module "next-auth" {
@@ -276,7 +277,7 @@ interface Project {
   id: string;
   name: string;
   jobSiteAddress: string;
-  subcontractorIds: string[];
+  taskIds: string[];
 }
 
 interface Schedule {
@@ -286,6 +287,29 @@ interface Schedule {
   date: string;
   time: string;
   confirmed: boolean;
+}
+
+enum TaskStatus {
+  pending = "pending",
+  in_progress = "in_progress",
+  completed = "completed",
+}
+
+enum TaskPriority {
+  low = "low",
+  medium = "medium",
+  high = "high",
+}
+
+interface Task {
+  id: string;
+  description: string;
+  status: TaskStatus;
+  priority?: TaskPriority;
+  startDate?: DateTime;
+  endDate?: DateTime;
+  projectId: string;
+  subcontractorIds?: string[];
 }
 
 interface AutomatedMessage {
@@ -339,6 +363,7 @@ export default function Messaging() {
   const [messages, setMessages] = useState<AutomatedMessage[]>([]);
   const [messageHistory, setMessageHistory] = useState<MessageHistory[]>([]);
   const [replies, setReplies] = useState<MessageReply[]>([]);
+  const [tasks, setTasks] = useState<Task[]>([]);
   const [projects, setProjects] = useState<Project[]>([]);
   const [newMessage, setNewMessage] = useState({
     name: "",
@@ -400,13 +425,14 @@ export default function Messaging() {
     const fetchData = async () => {
       try {
         setLoading(true);
-        const [subcontractorsRes, projectsRes, schedulesRes, messagesRes, historyRes, repliesRes] = await Promise.all([
+        const [subcontractorsRes, projectsRes, schedulesRes, messagesRes, historyRes, repliesRes, tasksRes] = await Promise.all([
           fetch("/api/subcontractors"),
           fetch("/api/projects"),
           fetch("/api/schedules"),
           fetch("/api/messages/automated"),
           fetch("/api/messages/history"),
           fetch("/api/messages/replies"),
+          fetch("/api/tasks"),
         ]);
 
         const errors: string[] = [];
@@ -434,6 +460,10 @@ export default function Messaging() {
           const errorText = await repliesRes.text();
           errors.push(`Replies API failed: ${repliesRes.status} ${repliesRes.statusText} - ${errorText}`);
         }
+        if (!tasksRes.ok) {
+          const errorText = await schedulesRes.text();
+          errors.push(`Tasks API failed: ${tasksRes.status} ${tasksRes.statusText} - ${errorText}`);
+        }
 
         if (errors.length > 0) {
           console.error("API Errors:", errors);
@@ -446,6 +476,7 @@ export default function Messaging() {
         const messagesData = await messagesRes.json();
         const historyData = await historyRes.json();
         const repliesData = await repliesRes.json();
+        const tasksData = await tasksRes.json();
 
         console.log("Subcontractors Data:", subcontractorsData);
         console.log("Projects Data:", projectsData);
@@ -456,6 +487,7 @@ export default function Messaging() {
         setMessages(messagesData);
         setMessageHistory(historyData);
         setReplies(repliesData);
+        setTasks(tasksData);
       } catch (error) {
         console.error("Error fetching data:", error);
         setError(error instanceof Error ? error.message : "Failed to load data. Please try again later.");
@@ -744,7 +776,15 @@ export default function Messaging() {
                       </div>
                       {selectedProject ? (
                         (() => {
-                          const filteredSubcontractors = subcontractors.filter((sub) => sub.projects.includes(selectedProject));
+                          const project = projects.find((project) => project.id === selectedProject)
+                          const selectedTaskIds = project?.taskIds
+                          const filteredTasks = tasks?.filter((task) => selectedTaskIds?.includes(task.id))
+                          const uniqueSubcontractorIds = [
+                            ...new Set(
+                              filteredTasks?.flatMap((task) => task.subcontractorIds || []) || []
+                            ),
+                          ];
+                          const filteredSubcontractors = subcontractors.filter((sub) => uniqueSubcontractorIds.includes(sub.id));
                           console.log("Selected Project ID:", selectedProject);
                           console.log("Subcontractors (before filter):", subcontractors);
                           console.log("Filtered Subcontractors:", filteredSubcontractors);
