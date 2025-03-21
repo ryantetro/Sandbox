@@ -1,0 +1,117 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mongodb"
+  url      = "mongodb+srv://ryanandalex:Sandbox2025!@sandbox.s9imj.mongodb.net/sandbox?retryWrites=true&w=majority"
+}
+
+model User {
+  id           String       @id @default(auto()) @map("_id") @db.ObjectId
+  email        String       @unique
+  passwordHash String
+  companyName  String
+  role         String?
+  projects     Project[]
+
+  @@map("users")
+}
+
+model Subcontractor {
+  id         String      @id @default(auto()) @map("_id") @db.ObjectId
+  name       String
+  phone      String
+  tasks      Task[]
+  role       String?
+  status     String      @default("Active")
+  schedules  Schedule[]
+  replies    MessageReply[] // Add relation to replies
+}
+
+model Project {
+  id                 String               @id @default(auto()) @map("_id") @db.ObjectId
+  name               String
+  jobSiteAddress     String
+  taskIds            String[]             @db.ObjectId
+  tasks              Task[]
+  schedules          Schedule[]
+  automatedMessages  AutomatedMessage[]
+  userId            String?   
+  user              User?    @relation(fields: [userId], references: [id])
+}
+
+enum TaskStatus {
+  pending
+  in_progress
+  completed
+}
+
+enum TaskPriority {
+  low
+  medium
+  high
+}
+
+model Task {
+  id                String          @id @default(auto()) @map("_id") @db.ObjectId
+  description       String
+  status            TaskStatus      @default(pending)
+  priority          TaskPriority?
+  startDate         DateTime?
+  endDate           DateTime?
+  projectId         String          @db.ObjectId
+  project           Project         @relation(fields: [projectId], references: [id])
+  subcontractorIds  String[]       @db.ObjectId
+  subcontractor     Subcontractor   @relation(fields: [subcontractorIds], references: [id])
+}
+
+model Schedule {
+  id              String        @id @default(auto()) @map("_id") @db.ObjectId
+  projectId       String        @db.ObjectId
+  project         Project       @relation(fields: [projectId], references: [id])
+  subcontractorId String        @db.ObjectId
+  subcontractor   Subcontractor @relation(fields: [subcontractorId], references: [id])
+  date            String
+  time            String
+  confirmed       Boolean       @default(false)
+}
+
+model AutomatedMessage {
+  id               String            @id @default(auto()) @map("_id") @db.ObjectId
+  name             String
+  content          String
+  projectId        String            @db.ObjectId
+  project          Project           @relation(fields: [projectId], references: [id])
+  deliveryMethod   String
+  trigger          Json              // e.g., { "type": "schedule-based", "offset": "-24h" }
+  status           String            @default("Active")
+  lastSent         String?
+  messageHistory   MessageHistory[]
+  date             String?           // Add date field
+  time             String?           // Add time field
+  type             String            // Add type field (e.g., "reminder", "reschedule", "update")
+  subcontractorIds String[]          @db.ObjectId // Add subcontractorIds field
+  replies          MessageReply[]    // Add relation to replies
+}
+
+model MessageHistory {
+  id               String            @id @default(auto()) @map("_id") @db.ObjectId
+  messageId        String            @db.ObjectId
+  automatedMessage AutomatedMessage  @relation(fields: [messageId], references: [id])
+  content          String
+  recipientId      String            @db.ObjectId
+  deliveryMethod   String
+  sentAt           String
+  status           String
+}
+
+model MessageReply {
+  id              String           @id @default(auto()) @map("_id") @db.ObjectId
+  messageId       String           @db.ObjectId
+  message         AutomatedMessage @relation(fields: [messageId], references: [id])
+  subcontractorId String           @db.ObjectId
+  subcontractor   Subcontractor    @relation(fields: [subcontractorId], references: [id])
+  reply           String
+  createdAt       DateTime         @default(now())
+}
