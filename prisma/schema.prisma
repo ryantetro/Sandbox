@@ -4,7 +4,7 @@ generator client {
 
 datasource db {
   provider = "mongodb"
-  url      = "mongodb+srv://ryanandalex:Sandbox2025!@sandbox.s9imj.mongodb.net/sandbox?retryWrites=true&w=majority"
+  url      = env("MONGO_URI")
 }
 
 model User {
