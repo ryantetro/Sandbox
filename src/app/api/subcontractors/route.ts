@@ -14,7 +14,7 @@ export async function GET() {
 
 export async function POST(request: Request) {
   try {
-    const { name, phone, projects, role, status } = await request.json();
+    const { name, phone, tasks, role, status } = await request.json();
     if (!name || !phone || !role) {
       return NextResponse.json({ error: "Missing required fields" }, { status: 400 });
     }
@@ -22,7 +22,7 @@ export async function POST(request: Request) {
       data: {
         name,
         phone,
-        projects: projects || [],
+        tasks: tasks || [],
         role,
         status: status || "Active",
       },
@@ -36,8 +36,8 @@ export async function POST(request: Request) {
 
 export async function PATCH(request: Request) {
   try {
-    const { id, projects } = await request.json();
-    if (!id || !projects) {
+    const { id, tasks } = await request.json();
+    if (!id || !tasks) {
       return NextResponse.json({ error: "Missing required fields" }, { status: 400 });
     }
 
@@ -52,7 +52,7 @@ export async function PATCH(request: Request) {
     const updatedSubcontractor = await prisma.subcontractor.update({
       where: { id },
       data: {
-        projects,
+        tasks,
       },
     });
 

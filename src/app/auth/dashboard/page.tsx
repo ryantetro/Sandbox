@@ -113,12 +113,35 @@ export default function Dashboard() {
     subcontractorIds: [] as string[],
   });
 
+  const [isScheduleModalOpen, setIsScheduleModalOpen] = useState(false);
+  const [taskToSchedule, setTaskToSchedule] = useState<string | null>(null); // Store the task ID
+  const [preferredStartDate, setPreferredStartDate] = useState(""); // e.g., "2025-03-22"
+  const [preferredEndDate, setPreferredEndDate] = useState("");
+  const [notes, setNotes] = useState(""); // Add this to your existing state variables
+  const [subcontractorsToSchedule, setSubcontractorsToSchedule] = useState<Subcontractor[]>([]);
+
   // Handle redirect on client-side only
   useEffect(() => {
     if (status === "unauthenticated") {
       router.push("/auth/login");
     }
   }, [status, router]);
+
+  useEffect(() => {
+    if (taskToSchedule) {
+      const task = tasks.find((t) => t.id === taskToSchedule);
+      if (task) {
+        const taskSubcontractors = subcontractors.filter((sub) =>
+          task.subcontractorIds?.includes(sub.id)
+        );
+        setSubcontractorsToSchedule(taskSubcontractors);
+      } else {
+        setSubcontractorsToSchedule([]);
+      }
+    } else {
+      setSubcontractorsToSchedule([]);
+    }
+  }, [taskToSchedule, tasks, subcontractors]); // Dependencies: run when these change
 
   // Fetch data on component mount
     useEffect(() => {
@@ -334,6 +357,52 @@ export default function Dashboard() {
     } catch (err) {
       console.error("Error creating project:", err);
       setError(err instanceof Error ? err.message : "Failed to create project. Please try again.");
+    }
+  };
+
+  const handleScheduleTask = async (taskId: string) => {
+    try {
+      // Find the task to get its details
+      const task = tasks.find((t) => t.id === taskId);
+      if (!task) {
+        setError("Task not found.");
+        return;
+      }
+  
+      // Simulate AI scheduling by setting a start date (e.g., tomorrow)
+      const newStartDate = new Date();
+      newStartDate.setDate(newStartDate.getDate() + 1); // Tomorrow
+  
+      // Update the task in the database
+      const response = await fetch(`/api/scheduleTask`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          taskId,
+          description: task.description,
+          preferredStartDate,
+          preferredEndDate,
+          subcontractorsToSchedule,
+          notes,
+          createdBy: session?.user?.id
+        }),
+        credentials: "include",
+      });
+  
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(`Failed to schedule task: ${response.status} ${response.statusText} - ${errorText}`);
+      }
+  
+      // Close the modal
+      setIsScheduleModalOpen(false);
+      setTaskToSchedule(null);
+      setError(null);
+    } catch (err) {
+      console.error("Error scheduling task:", err);
+      setError(err instanceof Error ? err.message : "Failed to schedule task. Please try again.");
     }
   };
 
@@ -555,6 +624,180 @@ export default function Dashboard() {
 
               <div className="section">
                 <div className="section-header">
+                  <h3 className="section-title">Needs Scheduling</h3>
+                </div>
+                <div className="section-content">
+                  <ul className="task-list">
+                    {needsScheduling.slice(0, 3).map((task) => (
+                      <li key={task.id} className="task-item">
+                        <div style={{ display: "flex", alignItems: "center" }}>
+                          <input
+                            type="checkbox"
+                            checked={task.status === "COMPLETED"}
+                            onChange={() => handleTaskCompletion(task.id)}
+                          />
+                          {/* Add Priority Dot */}
+                          {task.priority && (
+                            <span className={`priority-dot ${task.priority}`}></span>
+                          )}
+                          <span className={`task-text ${task.status === "COMPLETED" ? "completed" : ""}`}>
+                            {task.description}
+                          </span>
+                          {task.priority && (
+                            <span className={getPriorityClass(task.priority)}>
+                              {task.priority}
+                            </span>
+                          )}
+                        </div>
+                        {task.startDate ? (
+                          <span className={`task-due-date ${isOverdue(task.startDate) && task.status !== "COMPLETED" ? "overdue" : ""}`}>
+                            Scheduled Start Date: {new Date(task.startDate).toLocaleDateString()}
+                          </span>
+                        ) : (
+                          <button
+                            className="schedule-button"
+                            onClick={() => {
+                              setTaskToSchedule(task.id);
+                              setIsScheduleModalOpen(true);
+                            }}
+                          >
+                            Schedule
+                          </button>
+                        )}
+                      </li>
+                    ))}
+                  </ul>
+                  {tasks.length > 3 && (
+                    <button
+                      onClick={() => setActiveSection("tasks")}
+                      className="view-all-button"
+                    >
+                      View all tasks
+                    </button>
+                  )}
+                </div>
+                {isScheduleModalOpen && taskToSchedule && (
+                  <div className="schedule-modal">
+                    <div className="schedule-modal-content">
+                      <div className="schedule-modal-header">
+                        <h3>Confirm Scheduling</h3>
+                        <button
+                          onClick={() => {
+                            setIsScheduleModalOpen(false);
+                            setTaskToSchedule(null);
+                            setPreferredStartDate("");
+                            setPreferredEndDate("");
+                            setNotes("");
+                            setSubcontractorsToSchedule([]);
+                          }}
+                          className="close-modal-button"
+                        >
+                          <X size={20} />
+                        </button>
+                      </div>
+
+                      <div className="schedule-modal-body">
+                        <p>
+                          Do you want our AI assistant to schedule the contractor for this task?
+                        </p>
+                        {(() => {
+                          const task = tasks.find((t) => t.id === taskToSchedule);
+                          if (!task) return null;
+
+                          // Get the subcontractors associated with the task
+                          const taskSubcontractors = subcontractors.filter((sub) =>
+                            task.subcontractorIds?.includes(sub.id)
+                          );
+
+                          if (taskSubcontractors.length === 0) {
+                            return <p>No subcontractors assigned to this task.</p>;
+                          }
+
+                          return (
+                            <div>
+                              <p>The AI will schedule the following contractors:</p>
+                              <ul className="subcontractor-list-m">
+                                {taskSubcontractors.map((sub) => (
+                                  <li key={sub.id}>
+                                    <strong>{sub.name}</strong> {sub.role || "N/A"} ({sub.phone})
+                                  </li>
+                                ))}
+                              </ul>
+                              <div className="time-constraints">
+                                <h4>Time Constraints</h4>
+                                <div className="form-group">
+                                  <label htmlFor="preferred-start-date">
+                                    Preferred Start Date
+                                  </label>
+                                  <input
+                                    type="date"
+                                    id="preferred-start-date"
+                                    value={preferredStartDate}
+                                    onChange={(e) => setPreferredStartDate(e.target.value)}
+                                  />
+                                </div>
+                                <div className="form-group">
+                                  <label htmlFor="preferred-end-date">
+                                    Preferred End Date
+                                  </label>
+                                  <input
+                                    type="date"
+                                    id="preferred-end-date"
+                                    value={preferredEndDate}
+                                    onChange={(e) => setPreferredEndDate(e.target.value)}
+                                  />
+                                </div>
+                              </div>
+                              <div className="notes-section">
+                              <h4>Notes</h4>
+                                <div className="form-group">
+                                  <label htmlFor="scheduling-notes">
+                                    Additional Notes for Scheduling
+                                  </label>
+                                  <textarea
+                                    id="scheduling-notes"
+                                    value={notes}
+                                    onChange={(e) => setNotes(e.target.value)}
+                                    placeholder="Enter any additional notes or instructions relevant to scheduling this task..."
+                                    rows={4}
+                                  />
+                                </div>
+                              </div>
+                            </div>
+                          );
+                        })()}
+                      </div>
+
+                      {error && <p className="error-message">{error}</p>}
+
+                      <div className="schedule-modal-footer">
+                        <button
+                          onClick={() => {
+                            setIsScheduleModalOpen(false);
+                            setTaskToSchedule(null);
+                            setPreferredStartDate("");
+                            setPreferredEndDate("");
+                            setNotes("");
+                            setSubcontractorsToSchedule([]);
+                          }}
+                          className="cancel-button"
+                        >
+                          Cancel
+                        </button>
+                        <button
+                          onClick={() => handleScheduleTask(taskToSchedule)}
+                          className="confirm-schedule-button"
+                        >
+                          Confirm
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              <div className="section">
+                <div className="section-header">
                   <h3 className="section-title">Current Tasks</h3>
                 </div>
                 <div className="section-content">
@@ -634,57 +877,6 @@ export default function Dashboard() {
                         {task.startDate && (
                           <span className={`task-due-date ${isOverdue(task.startDate) && task.status != "COMPLETED" ? "overdue" : ""}`}>
                             Scheduled Start Date: {new Date(task.startDate).toLocaleDateString()}
-                          </span>
-                        )}
-                      </li>
-                    ))}
-                  </ul>
-                  {tasks.length > 3 && (
-                    <button
-                      onClick={() => setActiveSection("tasks")}
-                      className="view-all-button"
-                    >
-                      View all tasks
-                    </button>
-                  )}
-                </div>
-              </div>
-
-              <div className="section">
-                <div className="section-header">
-                  <h3 className="section-title">Needs Scheduling</h3>
-                </div>
-                <div className="section-content">
-                  <ul className="task-list">
-                    {needsScheduling.slice(0, 3).map((task) => (
-                      <li key={task.id} className="task-item">
-                        <div style={{ display: "flex", alignItems: "center" }}>
-                          <input
-                            type="checkbox"
-                            checked={task.status === "COMPLETED"}
-                            onChange={() => handleTaskCompletion(task.id)}
-                          />
-                          {/* Add Priority Dot */}
-                          {task.priority && (
-                            <span className={`priority-dot ${task.priority}`}></span>
-                          )}
-                          <span className={`task-text ${task.status === "COMPLETED" ? "completed" : ""}`}>
-                            {task.description}
-                          </span>
-                          {task.priority && (
-                            <span className={getPriorityClass(task.priority)}>
-                              {task.priority}
-                            </span>
-                          )}
-                        </div>
-                        {task.startDate && (
-                          <span className={`task-due-date ${isOverdue(task.startDate) && task.status != "COMPLETED" ? "overdue" : ""}`}>
-                            Scheduled Start Date: {new Date(task.startDate).toLocaleDateString()}
-                          </span>
-                        )}
-                        {!task.startDate && (
-                          <span className="task-due-date">
-                            No Scheduled Start Date
                           </span>
                         )}
                       </li>

@@ -14,8 +14,6 @@ export async function GET() {
       where: { id: session.user.id },
     });
 
-    console.log("User:", user);
-
     if (!user) {
       return NextResponse.json({ error: "User not found" }, { status: 404 });
     }
@@ -75,34 +73,5 @@ export async function POST(request: Request) {
   } catch (error) {
     console.error("POST /api/tasks error:", error);
     return NextResponse.json({ error: "Failed to create task" }, { status: 500 });
-  }
-}
-
-export async function PATCH(request: Request) {
-  try {
-    const { id, projects } = await request.json();
-    if (!id || !projects) {
-      return NextResponse.json({ error: "Missing required fields" }, { status: 400 });
-    }
-
-    const subcontractor = await prisma.subcontractor.findUnique({
-      where: { id },
-    });
-
-    if (!subcontractor) {
-      return NextResponse.json({ error: "Subcontractor not found" }, { status: 404 });
-    }
-
-    const updatedSubcontractor = await prisma.subcontractor.update({
-      where: { id },
-      data: {
-        projects,
-      },
-    });
-
-    return NextResponse.json(updatedSubcontractor);
-  } catch (error) {
-    console.error("PATCH /api/subcontractors error:", error);
-    return NextResponse.json({ error: "Failed to update subcontractor" }, { status: 500 });
   }
 }

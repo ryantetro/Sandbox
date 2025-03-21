@@ -15,19 +15,13 @@ export async function GET() {
       where: { id: session.user.id },
     });
 
-    console.log("User:", user);
-
     if (!user) {
       return NextResponse.json({ error: "User not found" }, { status: 404 });
     }
 
-    console.log("Querying projects for userId:", user.id);
-
     const projects = await prisma.project.findMany({
       where: { userId: user.id },
     });
-
-    console.log("Projects:", projects);
 
     return NextResponse.json(projects);
   } catch (error) {
