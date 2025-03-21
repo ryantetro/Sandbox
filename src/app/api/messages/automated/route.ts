@@ -3,6 +3,8 @@ import prisma from "@/lib/prisma";
 import { NextResponse } from "next/server";
 import twilio from "twilio";
 import { startMessageScheduler } from "@/lib/messageScheduler";
+import { getServerSession } from "next-auth/next";
+import { authOptions } from "@/pages/api/auth/[...nextauth]";
 
 // Initialize Twilio client
 const accountSid = process.env.TWILIO_ACCOUNT_SID;
@@ -20,12 +22,35 @@ startMessageScheduler();
 
 export async function GET() {
   try {
+    // Get the authenticated user's session
+    const session = await getServerSession(authOptions);
+    if (!session || !session.user?.id) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    // Fetch the user's projects to get their project IDs
+    const userProjects = await prisma.project.findMany({
+      where: { userId: session.user.id },
+      select: { id: true },
+    });
+
+    const projectIds = userProjects.map((project) => project.id);
+
+    if (projectIds.length === 0) {
+      return NextResponse.json([]); // Return empty array if user has no projects
+    }
+
+    // Fetch automated messages only for the user's projects
     const messages = await prisma.automatedMessage.findMany({
+      where: {
+        projectId: { in: projectIds },
+      },
       include: {
         project: true,
         replies: true,
       },
     });
+
     return NextResponse.json(messages);
   } catch (error) {
     console.error("GET /api/messages/automated error:", error);
@@ -35,20 +60,43 @@ export async function GET() {
 
 export async function POST(request: Request) {
   try {
-    const { name, content, projectId, deliveryMethod, trigger, status, date, time, type, subcontractorIds } = await request.json();
+    // Get the authenticated user's session
+    const session = await getServerSession(authOptions);
+    if (!session || !session.user?.id) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    const {
+      name,
+      content,
+      projectId,
+      deliveryMethod,
+      trigger,
+      status,
+      date,
+      time,
+      type,
+      subcontractorIds,
+    } = await request.json();
 
     // Validate required fields
     if (!name || !projectId || !content || !deliveryMethod || !trigger || !status || !type) {
       return NextResponse.json({ error: "Missing required fields" }, { status: 400 });
     }
 
-    // Fetch the project details
-    const project = await prisma.project.findUnique({
-      where: { id: projectId },
+    // Fetch the project and ensure it belongs to the authenticated user
+    const project = await prisma.project.findFirst({
+      where: {
+        id: projectId,
+        userId: session.user.id, // Ensure the project belongs to the user
+      },
     });
 
     if (!project) {
-      return NextResponse.json({ error: "Project not found" }, { status: 404 });
+      return NextResponse.json(
+        { error: "Project not found or not authorized" },
+        { status: 404 }
+      );
     }
 
     // Replace placeholders in the message content
@@ -71,6 +119,7 @@ export async function POST(request: Request) {
         time,
         type,
         subcontractorIds: subcontractorIds || project.subcontractorIds,
+        id: session.user.id, // Associate the message with the user
       },
       include: {
         project: true,

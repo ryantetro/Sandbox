@@ -387,7 +387,7 @@ body {
 }
 .task-item input[type="checkbox"]:focus {
   outline: none;
-  ring: 2px solid #2563eb; /* Equivalent to focus:ring-blue-500 */
+  box-shadow: 2px solid #2563eb; /* Equivalent to focus:ring-blue-500 */
 }
 .priority-dot {
   width: 0.75rem; /* Equivalent to w-3 */
