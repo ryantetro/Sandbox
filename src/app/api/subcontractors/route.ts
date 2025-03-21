@@ -15,7 +15,7 @@ export async function GET() {
 export async function POST(request: Request) {
   try {
     const { name, phone, projects, role, status } = await request.json();
-    if (!name || !phone || !role || !status) {
+    if (!name || !phone || !role) {
       return NextResponse.json({ error: "Missing required fields" }, { status: 400 });
     }
     const subcontractor = await prisma.subcontractor.create({
@@ -24,7 +24,7 @@ export async function POST(request: Request) {
         phone,
         projects: projects || [],
         role,
-        status,
+        status: status || "Active",
       },
     });
     return NextResponse.json(subcontractor, { status: 201 });
