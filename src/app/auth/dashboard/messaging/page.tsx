@@ -418,7 +418,7 @@ export default function Messaging() {
         }
         if (!schedulesRes.ok) {
           const errorText = await schedulesRes.text();
-          errors.push(`Schedules API failed: ${schedulesRes.status} ${schedulesRes.statusText} - ${errorText}`);
+          errors.push(`Schedules API failed: ${schedulesRes.status} ${subcontractorsRes.statusText} - ${errorText}`);
         }
         if (!messagesRes.ok) {
           const errorText = await messagesRes.text();
@@ -580,7 +580,7 @@ export default function Messaging() {
                 href="/auth/dashboard"
                 className={pathname === "/auth/dashboard" ? "active" : ""}
               >
-                <Home />
+                <Home className="sidebar-icon" />
                 <span>Dashboard</span>
               </Link>
             </li>
@@ -589,7 +589,7 @@ export default function Messaging() {
                 href="/auth/dashboard/messaging"
                 className={pathname === "/auth/dashboard/messaging" ? "active" : ""}
               >
-                <MessageSquare />
+                <MessageSquare className="sidebar-icon" />
                 <span>Messaging</span>
               </Link>
             </li>
@@ -598,7 +598,7 @@ export default function Messaging() {
                 onClick={() => router.push("/auth/dashboard#tasks")}
                 className={pathname.includes("#tasks") ? "active" : ""}
               >
-                <FileText />
+                <FileText className="sidebar-icon" />
                 <span>Tasks</span>
               </button>
             </li>
@@ -607,7 +607,7 @@ export default function Messaging() {
                 onClick={() => router.push("/auth/dashboard#calendar")}
                 className={pathname.includes("#calendar") ? "active" : ""}
               >
-                <Calendar />
+                <Calendar className="sidebar-icon" />
                 <span>Calendar</span>
               </button>
             </li>
@@ -616,7 +616,7 @@ export default function Messaging() {
                 onClick={() => router.push("/auth/dashboard#profile")}
                 className={pathname.includes("#profile") ? "active" : ""}
               >
-                <User />
+                <User className="sidebar-icon" />
                 <span>Profile</span>
               </button>
             </li>
@@ -625,7 +625,7 @@ export default function Messaging() {
                 onClick={() => router.push("/auth/dashboard#settings")}
                 className={pathname.includes("#settings") ? "active" : ""}
               >
-                <Settings />
+                <Settings className="sidebar-icon" />
                 <span>Settings</span>
               </button>
             </li>
@@ -637,7 +637,7 @@ export default function Messaging() {
             onClick={handleLogout}
             className="logout-button"
           >
-            <LogOut />
+            <LogOut className="sidebar-icon" />
             <span>Logout</span>
           </button>
         </div>
@@ -654,7 +654,7 @@ export default function Messaging() {
             <div className="header-right">
               <div className="relative">
                 <button className="notification-button">
-                  <Bell />
+                  <Bell className="sidebar-icon" />
                   {unreadNotificationsCount > 0 && (
                     <span className="notification-badge">
                       {unreadNotificationsCount}
@@ -670,7 +670,7 @@ export default function Messaging() {
                 <span className="user-name">
                   {session?.user?.name || session?.user?.email}
                 </span>
-                <ChevronDown />
+                <ChevronDown className="sidebar-icon" />
               </div>
             </div>
           </div>
