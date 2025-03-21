@@ -7,6 +7,7 @@ import { useSession, signOut } from "next-auth/react";
 import { Session } from "next-auth";
 import { useRouter, usePathname } from "next/navigation";
 import { Bell, Calendar, ChevronDown, FileText, Home, LogOut, Menu, MessageSquare, Settings, User, X } from "lucide-react";
+import { FaProjectDiagram, FaTimes } from "react-icons/fa";
 import Link from "next/link";
 import "../../styles/dashboard.css";
 
@@ -332,6 +333,7 @@ export default function Messaging() {
   const pathname = usePathname();
 
   const [selectedProject, setSelectedProject] = useState("");
+  const [activeSection, setActiveSection] = useState("messaging"); // Add activeSection state
   const [subcontractors, setSubcontractors] = useState<Subcontractor[]>([]);
   const [schedules, setSchedules] = useState<Schedule[]>([]);
   const [messages, setMessages] = useState<AutomatedMessage[]>([]);
@@ -574,24 +576,39 @@ export default function Messaging() {
         </div>
 
         <nav className="sidebar-nav">
-          <ul>
+          <ul style={{ listStyleType: "none" }}>
             <li>
-              <Link
-                href="/auth/dashboard"
-                className={pathname === "/auth/dashboard" ? "active" : ""}
+            <button
+                onClick={() => {
+                  setActiveSection("dashboard");
+                  router.push("/auth/dashboard"); // Navigate to dashboard page
+                }}
+                className={activeSection === "dashboard" ? "active" : ""}
               >
                 <Home className="sidebar-icon" />
                 <span>Dashboard</span>
-              </Link>
+              </button>
             </li>
             <li>
-              <Link
-                href="/auth/dashboard/messaging"
-                className={pathname === "/auth/dashboard/messaging" ? "active" : ""}
+            <button
+                onClick={() => {
+                  setActiveSection("messaging");
+                  router.push("/auth/dashboard/messaging"); // Navigate to messaging page
+                }}
+                className={activeSection === "messaging" ? "active" : ""}
               >
                 <MessageSquare className="sidebar-icon" />
                 <span>Messaging</span>
-              </Link>
+              </button>
+            </li>
+            <li>
+              <button
+                onClick={() => router.push("/auth/dashboard#projects")}
+                className={pathname.includes("#projects") ? "active" : ""}
+              >
+                <FaProjectDiagram className="sidebar-icon" />
+                <span>Projects</span>
+              </button>
             </li>
             <li>
               <button
