@@ -153,10 +153,10 @@ export default function Home() {
         <div className="hero-overlay"></div>
         <div className="hero-content">
           <h1 className="hero-title">
-            Building the Future, One Project at a Time
+            Helping you build the Future, One Schedule at a Time
           </h1>
           <p className="hero-subtitle">
-            At BuildRiser, we deliver top-tier construction services with precision and passion.
+            At BuildRiser, we provide a top-tier and reliable scheduling management system.
           </p>
           {session ? (
             <Link href="/auth/dashboard" className="cta-btn">
@@ -176,23 +176,23 @@ export default function Home() {
         <div className="learn-more-grid">
           <div className="learn-more-card">
             <FaHardHat className="card-icon" />
-            <h3 className="card-title">Expert Craftsmanship</h3>
+            <h3 className="card-title">Efficient Scheduling</h3>
             <p className="card-text">
-              Over 20 years of experience in residential and commercial construction.
+              Save time and reduce stress with automated scheduling that handles messaging, reminders, and rescheduling, keeping your projects on track without the constant phone calls.
             </p>
           </div>
           <div className="learn-more-card">
             <FaHardHat className="card-icon" />
-            <h3 className="card-title">Timely Delivery</h3>
+            <h3 className="card-title">Ease of Use</h3>
             <p className="card-text">
-              We pride ourselves on meeting deadlines without compromising quality.
+              Manage subcontractor schedules with ease through our intuitive, user-friendly interface, designed to help you focus on your projects rather than logistics.
             </p>
           </div>
           <div className="learn-more-card">
             <FaHardHat className="card-icon" />
-            <h3 className="card-title">Sustainable Practices</h3>
+            <h3 className="card-title">Reliability</h3>
             <p className="card-text">
-              Committed to eco-friendly building solutions for a better tomorrow.
+              Minimize project delays with reliable automated updates and real-time communication, ensuring that everyone stays informed and on schedule.
             </p>
           </div>
         </div>
@@ -233,7 +233,7 @@ export default function Home() {
                   {loginError && <p className="error-message">{loginError}</p>}
                 </form>
                 <p className="form-switch">
-                  Don&apos;t have an account?{" "}
+                  Don't have an account?{" "}
                   <a href="#" onClick={() => switchForm("signup")}>
                     Sign Up
                   </a>

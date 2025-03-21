@@ -12,6 +12,7 @@ import { DateTime } from "next-auth/providers/kakao";
 import { Calendar as BigCalendar, dateFnsLocalizer } from "react-big-calendar"
 import { format, parse, startOfWeek, getDay } from "date-fns"
 import { enUS } from "date-fns/locale/en-US"
+import CustomToolbar from "@/components/CalendarToolbar";
 
 // Setup date-fns localizer for react-big-calendar
 const locales = { "en-US": enUS };
@@ -1228,234 +1229,272 @@ export default function Dashboard() {
 
           {/* Tasks Section */}
           {activeSection === "tasks" && (
-            <div style={{ display: "flex", flexDirection: "column", gap: "1.5rem" }}>
-              <div className="section add-task-form">
-                <h3 className="add-task-title">Add New Task</h3>
+            <div className="tasks-container">
+              {/* Add New Task Section */}
+              <div className="card task-form-card">
+                <div className="card-header">
+                  <h3 className="card-title">Add New Task</h3>
+                </div>
+                <div className="card-body">
+                  <div className="form-grid">
+                    {/* Project Selection */}
+                    <div className="form-field">
+                      <label htmlFor="task-project" className="field-label">Project</label>
+                      <select
+                        id="task-project"
+                        value={newTaskProjectId}
+                        onChange={(e) => setNewTaskProjectId(e.target.value)}
+                        className="field-input"
+                        required
+                      >
+                        <option value="">Select a project</option>
+                        {projects.map((project) => (
+                          <option key={project.id} value={project.id}>
+                            {project.name}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
 
-                <div className="add-task-grid">
-                  {/* Project Selection (Required) */}
-                  <div className="form-group">
-                    <label htmlFor="task-project">Project</label>
-                    <select
-                      id="task-project"
-                      value={newTaskProjectId}
-                      onChange={(e) => setNewTaskProjectId(e.target.value)}
-                      className="add-task-input"
-                      required
-                    >
-                      <option value="">Select a project</option>
-                      {projects.map((project) => (
-                        <option key={project.id} value={project.id}>
-                          {project.name}
-                        </option>
-                      ))}
-                    </select>
+                    {/* Description */}
+                    <div className="form-field">
+                      <label htmlFor="task-description" className="field-label">Description</label>
+                      <input
+                        type="text"
+                        id="task-description"
+                        value={newTask}
+                        onChange={(e) => setNewTask(e.target.value)}
+                        placeholder="What needs to be done?"
+                        className="field-input"
+                        required
+                      />
+                    </div>
+
+                    {/* Start Date */}
+                    <div className="form-field">
+                      <label htmlFor="task-start-date" className="field-label">Start Date</label>
+                      <input
+                        type="date"
+                        id="task-start-date"
+                        value={newTaskStartDate}
+                        onChange={(e) => setNewTaskStartDate(e.target.value)}
+                        className="field-input"
+                      />
+                    </div>
+
+                    {/* Due Date */}
+                    <div className="form-field">
+                      <label htmlFor="task-due-date" className="field-label">Due Date</label>
+                      <input
+                        type="date"
+                        id="task-due-date"
+                        value={newTaskDueDate}
+                        onChange={(e) => setNewTaskDueDate(e.target.value)}
+                        className="field-input"
+                      />
+                    </div>
+
+                    {/* Priority */}
+                    <div className="form-field">
+                      <label htmlFor="task-priority" className="field-label">Priority</label>
+                      <select
+                        id="task-priority"
+                        value={newTaskPriority}
+                        onChange={(e) =>
+                          setNewTaskPriority(e.target.value as "low" | "medium" | "high")
+                        }
+                        className="field-input"
+                      >
+                        <option value="low">Low</option>
+                        <option value="medium">Medium</option>
+                        <option value="high">High</option>
+                      </select>
+                    </div>
+
+                    {/* Subcontractors */}
+                    <div className="form-field subcontractors-field">
+                      <label htmlFor="task-subcontractors" className="field-label">Subcontractors</label>
+                      <select
+                        id="task-subcontractors"
+                        multiple
+                        value={newTaskSubcontractorIds}
+                        onChange={(e) =>
+                          setNewTaskSubcontractorIds(
+                            Array.from(e.target.selectedOptions, (option) => option.value)
+                          )
+                        }
+                        className="field-input multi-select"
+                      >
+                        {subcontractors.map((sub) => (
+                          <option key={sub.id} value={sub.id}>
+                            {sub.name} ({sub.role || "N/A"})
+                          </option>
+                        ))}
+                      </select>
+                      <span className="helper-text">Hold Ctrl (or Cmd on Mac) to select multiple</span>
+                      <button
+                        type="button"
+                        onClick={() => setIsAddSubcontractorFormOpen(true)}
+                        className="text-button"
+                      >
+                        <span className="icon-plus">+</span> Add New Subcontractor
+                      </button>
+                    </div>
                   </div>
 
-                  {/* Description (Required) */}
-                  <div className="form-group">
-                    <label htmlFor="task-description">Description</label>
-                    <input
-                      type="text"
-                      id="task-description"
-                      value={newTask}
-                      onChange={(e) => setNewTask(e.target.value)}
-                      placeholder="What needs to be done?"
-                      className="add-task-input"
-                      required
-                    />
-                  </div>
+                  {/* Add New Subcontractor Modal */}
+                  {isAddSubcontractorFormOpen && (
+                    <div className="modal-overlay">
+                      <div className="modal-content">
+                        <div className="modal-header">
+                          <h4 className="modal-title">Add New Subcontractor</h4>
+                          <button 
+                            onClick={() => setIsAddSubcontractorFormOpen(false)}
+                            className="modal-close"
+                          >
+                            ×
+                          </button>
+                        </div>
+                        <form onSubmit={handleAddSubcontractor} className="modal-body">
+                          <div className="form-field">
+                            <label htmlFor="subcontractor-name" className="field-label">Name</label>
+                            <input
+                              type="text"
+                              id="subcontractor-name"
+                              value={newSubcontractor.name}
+                              onChange={(e) =>
+                                setNewSubcontractor({ ...newSubcontractor, name: e.target.value })
+                              }
+                              placeholder="Enter full name"
+                              required
+                              className="field-input"
+                            />
+                          </div>
+                          <div className="form-field">
+                            <label htmlFor="subcontractor-role" className="field-label">Role</label>
+                            <input
+                              type="text"
+                              id="subcontractor-role"
+                              value={newSubcontractor.role}
+                              onChange={(e) =>
+                                setNewSubcontractor({ ...newSubcontractor, role: e.target.value })
+                              }
+                              placeholder="Enter role"
+                              className="field-input"
+                            />
+                          </div>
+                          <div className="form-field">
+                            <label htmlFor="subcontractor-phone" className="field-label">Phone</label>
+                            <input
+                              type="text"
+                              id="subcontractor-phone"
+                              value={newSubcontractor.phone}
+                              onChange={(e) =>
+                                setNewSubcontractor({ ...newSubcontractor, phone: e.target.value })
+                              }
+                              placeholder="Enter phone number"
+                              className="field-input"
+                            />
+                          </div>
+                          <div className="modal-footer">
+                            <button
+                              type="button"
+                              onClick={() => setIsAddSubcontractorFormOpen(false)}
+                              className="button button-secondary"
+                            >
+                              Cancel
+                            </button>
+                            <button type="submit" className="button button-primary">
+                              Save Subcontractor
+                            </button>
+                          </div>
+                        </form>
+                      </div>
+                    </div>
+                  )}
 
-                  {/* Start Date (Optional) */}
-                  <div className="form-group">
-                    <label htmlFor="task-start-date">Start Date</label>
-                    <input
-                      type="date"
-                      id="task-start-date"
-                      value={newTaskStartDate}
-                      onChange={(e) => setNewTaskStartDate(e.target.value)}
-                      className="add-task-input"
-                    />
-                  </div>
-
-                  {/* Due Date (Optional) */}
-                  <div className="form-group">
-                    <label htmlFor="task-due-date">Due Date</label>
-                    <input
-                      type="date"
-                      id="task-due-date"
-                      value={newTaskDueDate}
-                      onChange={(e) => setNewTaskDueDate(e.target.value)}
-                      className="add-task-input"
-                    />
-                  </div>
-
-                  {/* Priority (Optional) */}
-                  <div className="form-group">
-                    <label htmlFor="task-priority">Priority</label>
-                    <select
-                      id="task-priority"
-                      value={newTaskPriority}
-                      onChange={(e) =>
-                        setNewTaskPriority(e.target.value as "low" | "medium" | "high")
-                      }
-                      className="add-task-input"
-                    >
-                      <option value="">None</option>
-                      <option value="low">Low</option>
-                      <option value="medium">Medium</option>
-                      <option value="high">High</option>
-                    </select>
-                  </div>
-
-                  {/* Subcontractors (Optional) */}
-                  <div className="form-group">
-                    <label htmlFor="task-subcontractors">Subcontractors</label>
-                    <select
-                      id="task-subcontractors"
-                      multiple
-                      value={newTaskSubcontractorIds}
-                      onChange={(e) =>
-                        setNewTaskSubcontractorIds(
-                          Array.from(e.target.selectedOptions, (option) => option.value)
-                        )
-                      }
-                      className="add-task-input"
-                    >
-                      {subcontractors.map((sub) => (
-                        <option key={sub.id} value={sub.id}>
-                          {sub.name} ({sub.role || "N/A"})
-                        </option>
-                      ))}
-                    </select>
-                    <small>Hold Ctrl (or Cmd on Mac) to select multiple subcontractors.</small>
-                    <button
-                      type="button"
-                      onClick={() => setIsAddSubcontractorFormOpen(true)}
-                      className="add-subcontractor-button"
-                    >
-                      Add New Subcontractor
+                  <div className="form-actions">
+                    {error && <p className="error-text">{error}</p>}
+                    <button onClick={handleAddTask} className="button button-primary">
+                      Add Task
                     </button>
                   </div>
                 </div>
-
-                {/* Add New Subcontractor Form (Inline) */}
-                {isAddSubcontractorFormOpen && (
-                  <div className="add-subcontractor-form">
-                    <h4>Add New Subcontractor</h4>
-                    <form onSubmit={handleAddSubcontractor}>
-                      <div className="form-group">
-                        <label htmlFor="subcontractor-name">Name</label>
-                        <input
-                          type="text"
-                          id="subcontractor-name"
-                          value={newSubcontractor.name}
-                          onChange={(e) =>
-                            setNewSubcontractor({ ...newSubcontractor, name: e.target.value })
-                          }
-                          placeholder="Enter subcontractor name"
-                          required
-                        />
-                      </div>
-                      <div className="form-group">
-                        <label htmlFor="subcontractor-role">Role</label>
-                        <input
-                          type="text"
-                          id="subcontractor-role"
-                          value={newSubcontractor.role}
-                          onChange={(e) =>
-                            setNewSubcontractor({ ...newSubcontractor, role: e.target.value })
-                          }
-                          placeholder="Enter role (optional)"
-                        />
-                      </div>
-                      <div className="form-group">
-                        <label htmlFor="subcontractor-phone">Phone</label>
-                        <input
-                          type="text"
-                          id="subcontractor-phone"
-                          value={newSubcontractor.phone}
-                          onChange={(e) =>
-                            setNewSubcontractor({ ...newSubcontractor, phone: e.target.value })
-                          }
-                          placeholder="Enter phone number (optional)"
-                        />
-                      </div>
-                      <div className="add-subcontractor-footer">
-                        <button
-                          type="button"
-                          onClick={() => setIsAddSubcontractorFormOpen(false)}
-                          className="cancel-button"
-                        >
-                          Cancel
-                        </button>
-                        <button type="submit" className="save-subcontractor-button">
-                          Save Subcontractor
-                        </button>
-                      </div>
-                    </form>
-                  </div>
-                )}
-
-                <div className="add-task-footer">
-                  <button onClick={handleAddTask} className="add-task-button">
-                    Add Task
-                  </button>
-                </div>
-
-                {error && <p className="error-message">{error}</p>}
               </div>
 
-              <div className="section">
-                <div className="task-list-header">
-                  <h3 className="task-list-title">Task List</h3>
-                  <div className="task-list-stats">
-                    {completedTasks} of {tasks.length} completed
+              {/* Task List Section */}
+              <div className="card task-list-card">
+                <div className="card-header">
+                  <div className="header-content">
+                    <h3 className="card-title">Task List</h3>
+                    <div className="task-stats">
+                      <div className="progress-bar">
+                        <div 
+                          className="progress-fill" 
+                          style={{ width: `${tasks.length ? (completedTasks / tasks.length) * 100 : 0}%` }}
+                        ></div>
+                      </div>
+                      <span className="stats-text">{completedTasks} of {tasks.length} completed</span>
+                    </div>
                   </div>
                 </div>
-
-                <div className="task-list-content">
-                  <ul className="task-list">
-                    {tasks.map((task) => (
-                      <li key={task.id} className="task-item">
-                        <div className="task-item-details">
-                          <input
-                            type="checkbox"
-                            checked={task.status === "completed"}
-                            onChange={() => handleTaskCompletion(task.id)}
-                          />
-                          <span className={`task-text ${task.status === "completed" ? "completed" : ""}`}>
-                            {task.description}
-                          </span>
-                          {task.priority && (
-                            <span className={`task-priority-tag ${task.priority}`}>
-                              {task.priority}
-                            </span>
-                          )}
-                        </div>
-
-                        <div className="task-actions">
-                          {task.endDate && (
-                            <span className={`task-due-date ${isOverdue(task.endDate) && task.status != "completed" ? "overdue" : ""}`}>
-                              {isOverdue(task.endDate) && task.status != "completed" ? "Overdue: " : "Due: "}
-                              {new Date(task.endDate).toLocaleDateString()}
-                            </span>
-                          )}
-
-                          <button
-                            onClick={() => handleDeleteTask(task.id)}
-                            className="delete-button"
-                          >
-                            <X className="sidebar-icon" />
-                          </button>
-                        </div>
-                      </li>
-                    ))}
-                  </ul>
-
-                  {tasks.length === 0 && (
-                    <div className="no-tasks">
-                      No tasks yet. Add a task to get started.
+                <div className="card-body">
+                  {tasks.length > 0 ? (
+                    <ul className="task-list">
+                      {tasks.map((task) => (
+                        <li key={task.id} className={`task-item ${task.status === "completed" ? "completed" : ""}`}>
+                          <div className="task-main">
+                            <label className="task-checkbox">
+                              <input
+                                type="checkbox"
+                                checked={task.status === "completed"}
+                                onChange={() => handleTaskCompletion(task.id)}
+                              />
+                              <span className="checkmark"></span>
+                            </label>
+                            <div className="task-content">
+                              <span className="task-description">{task.description}</span>
+                              <div className="task-metadata">
+                                {task.projectId && (
+                                  <span className="task-project">
+                                    {projects.find(p => p.id === task.projectId)?.name || "Unknown project"}
+                                  </span>
+                                )}
+                                {task.startDate && (
+                                  <span className="task-date">
+                                    Started: {new Date(task.startDate).toLocaleDateString()}
+                                  </span>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+                          <div className="task-actions">
+                            {task.priority && (
+                              <span className={`priority-badge ${task.priority}`}>
+                                {task.priority.charAt(0).toUpperCase() + task.priority.slice(1)}
+                              </span>
+                            )}
+                            {task.endDate && (
+                              <span className={`due-date ${isOverdue(task.endDate) && task.status !== "completed" ? "overdue" : ""}`}>
+                                {isOverdue(task.endDate) && task.status !== "completed" ? "Overdue" : "Due"}: 
+                                {new Date(task.endDate).toLocaleDateString()}
+                              </span>
+                            )}
+                            <button
+                              onClick={() => handleDeleteTask(task.id)}
+                              className="icon-button delete"
+                              aria-label="Delete task"
+                            >
+                              <X className="icon" />
+                            </button>
+                          </div>
+                        </li>
+                      ))}
+                    </ul>
+                  ) : (
+                    <div className="empty-state">
+                      <div className="empty-icon">📋</div>
+                      <p className="empty-text">No tasks yet. Add a task to get started.</p>
                     </div>
                   )}
                 </div>
@@ -1465,8 +1504,8 @@ export default function Dashboard() {
 
           {/* Calendar Section */}
           {activeSection === "calendar" && (
-            <div style={{ display: "flex", flexDirection: "column", gap: "1.5rem" }}>
-              <div className="section calendar-section">
+            <div className="calendar-container">
+              <div className="calendar-section">
                 <div className="section-header">
                   <h3 className="section-title">Calendar</h3>
                 </div>
@@ -1491,6 +1530,23 @@ export default function Dashboard() {
                     </select>
                   </div>
 
+                  {/* Calendar Navigation
+                  <div className="calendar-navigation">
+                    <div className="calendar-nav-buttons">
+                      <button className="calendar-nav-btn">Today</button>
+                      <button className="calendar-nav-btn">Back</button>
+                      <button className="calendar-nav-btn">Next</button>
+                    </div>
+                    <div className="calendar-title">
+                      <h4>March 2025</h4>
+                    </div>
+                    <div className="calendar-view-buttons">
+                      <button className="calendar-view-btn active">Month</button>
+                      <button className="calendar-view-btn">Week</button>
+                      <button className="calendar-view-btn">Day</button>
+                    </div>
+                  </div> */}
+
                   {/* Calendar */}
                   <BigCalendar
                     localizer={localizer}
@@ -1499,7 +1555,7 @@ export default function Dashboard() {
                     endAccessor="end"
                     defaultView="month"
                     views={["month", "week", "day"]}
-                    style={{ height: 600, marginTop: "1rem" }}
+                    className="minimal-calendar"
                     eventPropGetter={(event) => ({
                       className: `rbc-event ${
                         event.resource.type === "task"
@@ -1517,23 +1573,31 @@ export default function Dashboard() {
                       event: (props) => {
                         const { event } = props;
                         return (
-                          <div className="rbc-event-content" title={event.title}>
+                          <div className="calendar-event-content">
                             {event.title}
                           </div>
                         );
                       },
+                      toolbar: CustomToolbar,
                     }}
                     onSelectEvent={(event) => {
                       if (event.resource.type === "task") {
-                        const taskId = event.id.replace("task-", "");
-                        const currentStatus = tasks.find((t) => t.id === taskId)?.status;
-                        const newStatus =
-                          currentStatus === "completed" ? "in_progress" : "completed";
-                        setTasks(
-                          tasks.map((task) =>
-                            task.id === taskId ? { ...task, status: newStatus as TaskStatus } : task
-                          )
-                        );
+                        const taskId = (event as HTMLElement).id.replace("task-", "");
+                        const currentTask = tasks.find((t) => t.id === taskId);
+                        
+                        if (currentTask) {
+                          const newStatus = currentTask.status === "completed" 
+                            ? "in_progress" 
+                            : "completed";
+                          
+                          setTasks(
+                            tasks.map((task) =>
+                              task.id === taskId 
+                                ? { ...task, status: newStatus as TaskStatus } 
+                                : task
+                            )
+                          );
+                        }
                       }
                     }}
                   />
