@@ -138,6 +138,10 @@ export default function Dashboard() {
   const pendingTasks = tasks.filter((task) => !task.completed).length;
   const overdueTasks = tasks.filter((task) => !task.completed && isOverdue(task.dueDate)).length;
 
+  function handleNavigation(arg0: string, arg1: string): void {
+    throw new Error("Function not implemented.");
+  }
+
   return (
     <div className="dashboard-container">
       {/* Mobile sidebar toggle */}
@@ -160,28 +164,34 @@ export default function Dashboard() {
         </div>
 
         <nav className="sidebar-nav">
-          <ul>
+          <ul style={{ listStyleType: "none" }}>
             <li>
               <button
                 onClick={() => setActiveSection("dashboard")}
                 className={activeSection === "dashboard" ? "active" : ""}
               >
-                <Home />
+                <Home className="sidebar-icon"/>
                 <span>Dashboard</span>
               </button>
             </li>
             <li>
-              <Link href="/auth/dashboard/messaging" className={activeSection === "messaging" ? "active" : ""}>
-                <MessageSquare />
+              <button
+                onClick={() => {
+                  setActiveSection("messaging");
+                  router.push("/auth/dashboard/messaging"); // Navigate to messaging page
+                }}
+                className={activeSection === "messaging" ? "active" : ""}
+              >
+                <MessageSquare className="sidebar-icon"/>
                 <span>Messaging</span>
-              </Link>
+              </button>
             </li>
             <li>
               <button
                 onClick={() => setActiveSection("tasks")}
                 className={activeSection === "tasks" ? "active" : ""}
               >
-                <FileText />
+                <FileText className="sidebar-icon"/>
                 <span>Tasks</span>
               </button>
             </li>
@@ -190,7 +200,7 @@ export default function Dashboard() {
                 onClick={() => setActiveSection("calendar")}
                 className={activeSection === "calendar" ? "active" : ""}
               >
-                <Calendar />
+                <Calendar className="sidebar-icon"/>
                 <span>Calendar</span>
               </button>
             </li>
@@ -199,7 +209,7 @@ export default function Dashboard() {
                 onClick={() => setActiveSection("profile")}
                 className={activeSection === "profile" ? "active" : ""}
               >
-                <User />
+                <User className="sidebar-icon"/>
                 <span>Profile</span>
               </button>
             </li>
@@ -208,7 +218,7 @@ export default function Dashboard() {
                 onClick={() => setActiveSection("settings")}
                 className={activeSection === "settings" ? "active" : ""}
               >
-                <Settings />
+                <Settings className="sidebar-icon"/>
                 <span>Settings</span>
               </button>
             </li>
@@ -220,7 +230,7 @@ export default function Dashboard() {
             onClick={handleLogout}
             className="logout-button"
           >
-            <LogOut />
+            <LogOut className="sidebar-icon"/>
             <span>Logout</span>
           </button>
         </div>

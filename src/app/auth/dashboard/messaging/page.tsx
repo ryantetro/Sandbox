@@ -332,6 +332,7 @@ export default function Messaging() {
   const pathname = usePathname();
 
   const [selectedProject, setSelectedProject] = useState("");
+  const [activeSection, setActiveSection] = useState("messaging"); // Add activeSection state
   const [subcontractors, setSubcontractors] = useState<Subcontractor[]>([]);
   const [schedules, setSchedules] = useState<Schedule[]>([]);
   const [messages, setMessages] = useState<AutomatedMessage[]>([]);
@@ -574,24 +575,30 @@ export default function Messaging() {
         </div>
 
         <nav className="sidebar-nav">
-          <ul>
+          <ul style={{ listStyleType: "none" }}>
             <li>
-              <Link
-                href="/auth/dashboard"
-                className={pathname === "/auth/dashboard" ? "active" : ""}
+            <button
+                onClick={() => {
+                  setActiveSection("dashboard");
+                  router.push("/auth/dashboard"); // Navigate to dashboard page
+                }}
+                className={activeSection === "dashboard" ? "active" : ""}
               >
                 <Home className="sidebar-icon" />
                 <span>Dashboard</span>
-              </Link>
+              </button>
             </li>
             <li>
-              <Link
-                href="/auth/dashboard/messaging"
-                className={pathname === "/auth/dashboard/messaging" ? "active" : ""}
+            <button
+                onClick={() => {
+                  setActiveSection("messaging");
+                  router.push("/auth/dashboard/messaging"); // Navigate to messaging page
+                }}
+                className={activeSection === "messaging" ? "active" : ""}
               >
                 <MessageSquare className="sidebar-icon" />
                 <span>Messaging</span>
-              </Link>
+              </button>
             </li>
             <li>
               <button
