@@ -233,7 +233,7 @@ export default function Home() {
                   {loginError && <p className="error-message">{loginError}</p>}
                 </form>
                 <p className="form-switch">
-                  Don't have an account?{" "}
+                  Don&apos;t have an account?{" "}
                   <a href="#" onClick={() => switchForm("signup")}>
                     Sign Up
                   </a>

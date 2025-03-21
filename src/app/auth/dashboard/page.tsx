@@ -6,24 +6,9 @@ import { useSession, signOut } from "next-auth/react";
 import { Session } from "next-auth";
 import { useRouter } from "next/navigation";
 import { FaProjectDiagram } from "react-icons/fa";
-import { Bell, Calendar, ChevronDown, FileText, Home, LogOut, Menu, MessageSquare, Settings, User, X, FolderKanban, Hammer, MapPin, Save, Clock, AlertTriangle, CheckCircle } from "lucide-react";
+import { Bell, Calendar, ChevronDown, FileText, Home, LogOut, Menu, MessageSquare, Settings, User, X, FolderKanban, Hammer, MapPin, Save } from "lucide-react";
 import "../styles/dashboard.css";
 import { DateTime } from "next-auth/providers/kakao";
-import { Calendar as BigCalendar, dateFnsLocalizer } from "react-big-calendar"
-import { format, parse, startOfWeek, getDay } from "date-fns"
-import { enUS } from "date-fns/locale/en-US"
-import CustomToolbar from "@/components/CalendarToolbar";
-
-// Setup date-fns localizer for react-big-calendar
-const locales = { "en-US": enUS };
-const localizer = dateFnsLocalizer({
-  format,
-  parse,
-  startOfWeek: () => startOfWeek(new Date(), { weekStartsOn: 1 }),
-  getDay,
-  locales,
-});
-
 
 // Extend the Session type to include companyName and role
 declare module "next-auth" {
@@ -78,15 +63,6 @@ interface Project {
   taskIds: string[];
 }
 
-interface Schedule {
-  id: string;
-  projectId: string;
-  subcontractorId: string;
-  date: string;
-  time: string;
-  confirmed: boolean;
-}
-
 export default function Dashboard() {
   interface ExtendedUser {
     companyName?: string;
@@ -96,10 +72,8 @@ export default function Dashboard() {
   const { data: session, status } = useSession() as { data: Session & { user: ExtendedUser }; status: "loading" | "authenticated" | "unauthenticated" };
   const router = useRouter();
 
-  const [calendarProjectFilter, setCalendarProjectFilter] = useState("all");
   const [selectedProject, setSelectedProject] = useState("");
   const [subcontractors, setSubcontractors] = useState<Subcontractor[]>([]);
-  const [schedules, setSchedules] = useState<Schedule[]>([]);
   const [projects, setProjects] = useState<Project[]>([]);
   const [tasks, setTasks] = useState<Task[]>([]);
   const [newTask, setNewTask] = useState("");
@@ -162,10 +136,9 @@ export default function Dashboard() {
     useEffect(() => {
       const fetchData = async () => {
         try {
-          const [subcontractorsRes, projectsRes, schedulesRes, tasksRes] = await Promise.all([
+          const [subcontractorsRes, projectsRes, tasksRes] = await Promise.all([
             fetch("/api/subcontractors"),
             fetch("/api/projects"),
-            fetch("/api/schedules"),
             fetch("/api/tasks")
           ]);
   
@@ -178,12 +151,8 @@ export default function Dashboard() {
             const errorText = await projectsRes.text();
             errors.push(`Projects API failed: ${projectsRes.status} ${projectsRes.statusText} - ${errorText}`);
           }
-          if (!schedulesRes.ok) {
-            const errorText = await schedulesRes.text();
-            errors.push(`Schedules API failed: ${schedulesRes.status} ${schedulesRes.statusText} - ${errorText}`);
-          }
           if (!tasksRes.ok) {
-            const errorText = await schedulesRes.text();
+            const errorText = await tasksRes.text();
             errors.push(`Tasks API failed: ${tasksRes.status} ${tasksRes.statusText} - ${errorText}`);
           }
   
@@ -194,12 +163,10 @@ export default function Dashboard() {
   
           const subcontractorsData = await subcontractorsRes.json();
           const projectsData = await projectsRes.json();
-          const schedulesData = await schedulesRes.json();
           const tasksData = await tasksRes.json();
   
           setSubcontractors(subcontractorsData);
           setProjects(projectsData);
-          setSchedules(schedulesData);
           setTasks(tasksData);
         } catch (error) {
           console.error("Error fetching data:", error);
@@ -445,89 +412,6 @@ export default function Dashboard() {
 
   // Calculate progress percentage for the progress bar
   const progressPercentage = tasks.length > 0 ? (completedTasks / tasks.length) * 100 : 0;
-
-  // Calendar Events: Combine tasks and schedules
-  const calendarEvents = [
-      // Tasks as events
-      ...tasks
-        .filter((task) => {
-          if (calendarProjectFilter === "all") return true;
-          return task.projectId === calendarProjectFilter;
-        })
-        .filter((task) => task.startDate && task.endDate) // Only include tasks with start and end dates
-        .map((task) => {
-          const start = new Date(task.startDate!);
-          const end = new Date(task.endDate!);
-          // Ensure dates are valid
-          if (isNaN(start.getTime()) || isNaN(end.getTime())) {
-            console.warn(`Invalid dates for task ${task.id}:`, task.startDate, task.endDate);
-            return null;
-          }
-          return {
-            id: `task-${task.id}`,
-            title: `Task: ${task.description} (${projects.find((p) => p.id === task.projectId)?.name || "Unknown"})`,
-            start,
-            end,
-            allDay: false,
-            resource: {
-              type: "task",
-              priority: task.priority,
-              status: task.status,
-            },
-          };
-        })
-        .filter((event) => event !== null), // Remove invalid events
-      // Schedules as events
-      ...schedules
-        .filter((schedule) => {
-          if (calendarProjectFilter === "all") return true;
-          return schedule.projectId === calendarProjectFilter;
-        })
-        .map((schedule) => {
-          const subcontractor = subcontractors.find((sub) => sub.id === schedule.subcontractorId);
-          const project = projects.find((proj) => proj.id === schedule.projectId);
-          const dateTimeStr = `${schedule.date} ${schedule.time}`;
-          const eventDate = new Date(dateTimeStr);
-          if (isNaN(eventDate.getTime())) {
-            console.warn(`Invalid date for schedule ${schedule.id}:`, dateTimeStr);
-            return null;
-          }
-          return {
-            id: `schedule-${schedule.id}`,
-            title: `Schedule: ${subcontractor?.name || "Unknown"} @ ${project?.name || "Unknown"}`,
-            start: eventDate,
-            end: eventDate, // Schedules are point-in-time events
-            allDay: false,
-            resource: {
-              type: "schedule",
-              confirmed: schedule.confirmed,
-            },
-          };
-        })
-        .filter((event) => event !== null), // Remove invalid events
-    ];
-  
-    // Log events for debugging
-    console.log("Calendar Events:", calendarEvents);
-  
-    // Analytics for Calendar Section
-    const filteredTasks = tasks.filter((task) => {
-      if (calendarProjectFilter === "all") return true;
-      return task.projectId === calendarProjectFilter;
-    });
-  
-    const filteredUpcomingTasks = filteredTasks.filter((task) => {
-      if (!task.endDate) return false;
-      const due = new Date(task.endDate);
-      const now = new Date();
-      const diff = due.getTime() - now.getTime();
-      return diff > 0 && diff <= 7 * 24 * 60 * 60 * 1000; // Within 7 days
-    }).length;
-  
-    const filteredOverdueTasks = filteredTasks.filter((task) => task.status !== "completed" && isOverdue(task.endDate)).length;
-  
-    const filteredCompletedTasks = filteredTasks.filter((task) => task.status === "completed").length;
-    const completionPercentage = filteredTasks.length > 0 ? (filteredCompletedTasks / filteredTasks.length) * 100 : 0;
 
   return (
     <div className="dashboard-container">
