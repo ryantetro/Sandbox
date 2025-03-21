@@ -549,7 +549,7 @@ export default function Messaging() {
 
   // Handle logout
   const handleLogout = () => {
-    signOut({ callbackUrl: "/auth/login" });
+    signOut({ callbackUrl: "/auth/home" });
   };
 
   const unreadNotificationsCount = notifications.filter((n) => !n.read).length;
