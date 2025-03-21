@@ -312,7 +312,7 @@ export default function Dashboard() {
                 onClick={() => setActiveSection("projects")}
                 className={activeSection === "projects" ? "active" : ""}
               >
-                <FolderKanban />
+                <FolderKanban className="sidebar-icon"/>
                 <span>Projects</span>
               </button>
             </li>
