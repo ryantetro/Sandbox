@@ -6,7 +6,7 @@ import React from "react";
 import { useSession, signOut } from "next-auth/react";
 import { Session } from "next-auth";
 import { useRouter, usePathname } from "next/navigation";
-import { Bell, Calendar, ChevronDown, FileText, Home, LogOut, Menu, MessageSquare, Settings, User, X } from "lucide-react";
+import { Bell, Calendar, ChevronDown, FileText, FolderKanban, Home, LogOut, Menu, MessageSquare, Settings, User, X } from "lucide-react";
 import { FaProjectDiagram, FaTimes } from "react-icons/fa";
 import Link from "next/link";
 import "../../styles/dashboard.css";
@@ -549,7 +549,7 @@ export default function Messaging() {
 
   // Handle logout
   const handleLogout = () => {
-    signOut({ callbackUrl: "/auth/login" });
+    signOut({ callbackUrl: "/auth/home" });
   };
 
   const unreadNotificationsCount = notifications.filter((n) => !n.read).length;
@@ -606,7 +606,7 @@ export default function Messaging() {
                 onClick={() => router.push("/auth/dashboard#projects")}
                 className={pathname.includes("#projects") ? "active" : ""}
               >
-                <FaProjectDiagram className="sidebar-icon" />
+                <FolderKanban className="sidebar-icon" />
                 <span>Projects</span>
               </button>
             </li>
