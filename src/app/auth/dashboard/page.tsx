@@ -5,9 +5,8 @@ import { useState, useEffect } from "react";
 import { useSession, signOut } from "next-auth/react";
 import { Session } from "next-auth";
 import { useRouter } from "next/navigation";
-import { FaProjectDiagram, FaTimes } from "react-icons/fa";
-import { Bell, Calendar, ChevronDown, ChevronUp, FileText, Home, LogOut, Menu, MessageSquare, Settings, User, X, FolderKanban, Kanban, Hammer, MapPin, Users, Plus, Save, Clock, AlertTriangle, CheckCircle } from "lucide-react";
-import Link from "next/link";
+import { FaProjectDiagram } from "react-icons/fa";
+import { Bell, Calendar, ChevronDown, FileText, Home, LogOut, Menu, MessageSquare, Settings, User, X, FolderKanban, Hammer, MapPin, Save, Clock, AlertTriangle, CheckCircle } from "lucide-react";
 import "../styles/dashboard.css";
 import { DateTime } from "next-auth/providers/kakao";
 import { Calendar as BigCalendar, dateFnsLocalizer } from "react-big-calendar"
@@ -1089,9 +1088,6 @@ export default function Dashboard() {
                       const projectTasks = tasks.filter((task) =>
                         project.taskIds.includes(task.id)
                       );
-                      const projectSchedules = schedules.filter(
-                        (schedule) => schedule.projectId === project.id
-                      );
 
                       return (
                         <div className="project-details-content">
@@ -1509,9 +1505,9 @@ export default function Dashboard() {
                         event.resource.type === "task"
                           ? ("priority" in event.resource ? event.resource.priority || "medium" : "") +
                             " " +
-                            (event.resource.status === "completed" ? "completed" : "")
+                            ("status" in event.resource && event.resource.status === "completed" ? "completed" : "")
                           : event.resource.type === "schedule"
-                          ? event.resource.confirmed
+                          ? 'confirmed' in event.resource && event.resource.confirmed
                             ? "schedule-confirmed"
                             : "schedule-pending"
                           : ""
@@ -1535,7 +1531,7 @@ export default function Dashboard() {
                           currentStatus === "completed" ? "in_progress" : "completed";
                         setTasks(
                           tasks.map((task) =>
-                            task.id === taskId ? { ...task, status: newStatus } : task
+                            task.id === taskId ? { ...task, status: newStatus as TaskStatus } : task
                           )
                         );
                       }

@@ -61,8 +61,8 @@ export async function POST(request: Request) {
           where: {
             projectId: messageWithProject.projectId,
             subcontractorId,
-            date: messageWithProject.date,
-            time: messageWithProject.time,
+            date: messageWithProject.date ?? undefined,
+            time: messageWithProject.time ?? undefined,
           },
         });
 

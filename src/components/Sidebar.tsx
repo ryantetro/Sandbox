@@ -36,7 +36,7 @@ export default function Sidebar() {
       <nav className="sidebar-nav">
         {navItems.map((item) => {
           // Check if the current path matches the item's path or a subpath (e.g., /auth/dashboard/tasks)
-          const isActive = pathname === item.path || (pathname.startsWith(item.path) && item.path !== "/auth/dashboard");
+          const isActive = pathname === item.path || (pathname?.startsWith(item.path) && item.path !== "/auth/dashboard");
           return (
             <Link
               key={item.name}

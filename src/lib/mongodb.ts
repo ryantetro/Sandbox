@@ -12,7 +12,7 @@ let clientPromise: Promise<MongoClient>;
 // This is to handle the connection in a way that works with Next.js (both development and production).
 if (process.env.NODE_ENV === "development") {
   // In development mode, use a global variable so the MongoDB client isn't recreated every time the server restarts
-  let globalWithMongo = global as typeof globalThis & { _mongoClientPromise?: Promise<MongoClient> };
+  const globalWithMongo = global as typeof globalThis & { _mongoClientPromise?: Promise<MongoClient> };
   if (!globalWithMongo._mongoClientPromise) {
     globalWithMongo._mongoClientPromise = client.connect();
   }

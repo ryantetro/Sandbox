@@ -101,7 +101,7 @@ export default function Home() {
       setSignupForm({ name: "", email: "", password: "", companyName: "" });
     } catch (error) {
       setIsLoading(false);
-      setSignupError("Failed to create account. Please try again.");
+      setSignupError(`Failed to create account. Please try again. ${error}`);
     }
   };
 
@@ -233,7 +233,7 @@ export default function Home() {
                   {loginError && <p className="error-message">{loginError}</p>}
                 </form>
                 <p className="form-switch">
-                  Don't have an account?{" "}
+                  Don&apos;t have an account?{" "}
                   <a href="#" onClick={() => switchForm("signup")}>
                     Sign Up
                   </a>

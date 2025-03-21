@@ -52,7 +52,7 @@ export async function POST(request: Request) {
     }
 
     // Replace placeholders in the message content
-    let formattedContent = content
+    const formattedContent = content
       .replace("{ProjectName}", project.name)
       .replace("{JobSiteAddress}", project.jobSiteAddress)
       .replace("{Date}", date || "TBD")
@@ -70,7 +70,7 @@ export async function POST(request: Request) {
         date,
         time,
         type,
-        subcontractorIds: subcontractorIds || project.subcontractorIds,
+        subcontractorIds: subcontractorIds,
       },
       include: {
         project: true,
@@ -83,7 +83,7 @@ export async function POST(request: Request) {
       // Fetch subcontractors to get their phone numbers
       const subcontractors = await prisma.subcontractor.findMany({
         where: {
-          id: { in: subcontractorIds || project.subcontractorIds },
+          id: { in: subcontractorIds },
         },
       });
 

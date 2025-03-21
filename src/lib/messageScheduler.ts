@@ -57,7 +57,9 @@ const sendScheduledMessages = async () => {
       const scheduledDate = new Date(year, month - 1, day, hour, minute);
 
       // Calculate the send time based on the trigger offset
-      const offsetMs = parseOffsetToMilliseconds(message.trigger.offset || "-24h");
+      const offsetMs = parseOffsetToMilliseconds(
+        message.trigger && typeof message.trigger === 'object' && 'offset' in message.trigger && typeof message.trigger.offset === 'string' ? message.trigger.offset : "-24h"
+      );
       const sendTime = new Date(scheduledDate.getTime() - offsetMs);
 
       // If the current time is past the send time, send the message

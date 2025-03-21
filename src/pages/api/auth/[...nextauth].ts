@@ -3,6 +3,14 @@ import CredentialsProvider from "next-auth/providers/credentials";
 import bcrypt from "bcryptjs";
 import clientPromise from "../../../lib/mongodb";
 
+// Extend User type to include companyName
+declare module "next-auth" {
+  interface User {
+    companyName?: string;
+    role?: string;
+  }
+}
+
 // Explicitly type authOptions as AuthOptions
 export const authOptions: AuthOptions = {
   providers: [

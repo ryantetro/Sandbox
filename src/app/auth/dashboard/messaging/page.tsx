@@ -7,8 +7,6 @@ import { useSession, signOut } from "next-auth/react";
 import { Session } from "next-auth";
 import { useRouter, usePathname } from "next/navigation";
 import { Bell, Calendar, ChevronDown, FileText, FolderKanban, Home, LogOut, Menu, MessageSquare, Settings, User, X } from "lucide-react";
-import { FaProjectDiagram, FaTimes } from "react-icons/fa";
-import Link from "next/link";
 import "../../styles/dashboard.css";
 import { DateTime } from "next-auth/providers/kakao";
 
@@ -16,6 +14,7 @@ import { DateTime } from "next-auth/providers/kakao";
 declare module "next-auth" {
   interface Session {
     user: {
+      id?: string;
       name?: string | null;
       email?: string | null;
       image?: string | null;
@@ -40,10 +39,10 @@ function Tabs({ defaultValue, children, className }: TabsProps) {
       {React.Children.map(children, (child) => {
         if (React.isValidElement(child)) {
           if (child.type === TabsList) {
-            return React.cloneElement(child, { activeTab, setActiveTab } as any);
+            return React.cloneElement(child, { activeTab, setActiveTab } as React.ComponentProps<typeof TabsList>);
           }
           if (child.type === TabsContent) {
-            return React.cloneElement(child, { activeTab } as any);
+            return React.cloneElement(child, { activeTab } as React.ComponentProps<typeof TabsContent>);
           }
         }
         return child;
@@ -63,7 +62,7 @@ function TabsList({ children, activeTab, setActiveTab }: TabsListProps) {
     <div className="tabs-list">
       {React.Children.map(children, (child) => {
         if (React.isValidElement(child) && child.type === TabsTrigger) {
-          return React.cloneElement(child, { activeTab, setActiveTab } as any);
+          return React.cloneElement(child, { activeTab, setActiveTab } as unknown as React.ComponentProps<typeof TabsTrigger>);
         }
         return child;
       })}
@@ -181,18 +180,24 @@ function Select({ children, onValueChange, value, options, multiple = false }: S
       {React.Children.map(children, (child) => {
         if (React.isValidElement(child)) {
           if (child.type === SelectTrigger) {
-            return React.cloneElement(child, {
-              onToggle: () => setIsOpen(!isOpen),
-              isOpen,
-              selectedLabel: multiple
-                ? (value as string[])?.length > 0
-                  ? `${(value as string[]).length} selected`
-                  : "Select subcontractors"
-                : options.find((opt) => opt.value === value)?.label || "Select an option",
-            } as any);
+            return React.cloneElement(
+              child,
+              {
+                onToggle: () => setIsOpen(!isOpen),
+                isOpen,
+                selectedLabel: multiple
+                  ? (value as string[])?.length > 0
+                    ? `${(value as string[]).length} selected`
+                    : "Select subcontractors"
+                  : options.find((opt) => opt.value === value)?.label || "Select an option",
+              } as React.ComponentProps<typeof SelectTrigger>
+            );
           }
           if (child.type === SelectContent) {
-            return React.cloneElement(child, { isOpen, onSelect: handleSelect } as any);
+            return React.cloneElement(
+              child,
+              { isOpen, onSelect: handleSelect } as React.ComponentProps<typeof SelectContent>
+            );
           }
         }
         return child;
@@ -200,6 +205,7 @@ function Select({ children, onValueChange, value, options, multiple = false }: S
     </div>
   );
 }
+
 
 interface SelectTriggerProps {
   children: React.ReactNode;
@@ -237,7 +243,7 @@ function SelectContent({ children, isOpen, onSelect }: SelectContentProps) {
     <div className="select-content">
       {React.Children.map(children, (child) => {
         if (React.isValidElement(child) && child.type === SelectItem) {
-          return React.cloneElement(child, { onSelect } as any);
+          return React.cloneElement(child, { onSelect } as React.ComponentProps<typeof SelectItem>);
         }
         return child;
       })}
@@ -362,7 +368,7 @@ export default function Messaging() {
   const [schedules, setSchedules] = useState<Schedule[]>([]);
   const [messages, setMessages] = useState<AutomatedMessage[]>([]);
   const [messageHistory, setMessageHistory] = useState<MessageHistory[]>([]);
-  const [replies, setReplies] = useState<MessageReply[]>([]);
+  // const [replies, setReplies] = useState<MessageReply[]>([]);
   const [tasks, setTasks] = useState<Task[]>([]);
   const [projects, setProjects] = useState<Project[]>([]);
   const [newMessage, setNewMessage] = useState({
@@ -425,13 +431,13 @@ export default function Messaging() {
     const fetchData = async () => {
       try {
         setLoading(true);
-        const [subcontractorsRes, projectsRes, schedulesRes, messagesRes, historyRes, repliesRes, tasksRes] = await Promise.all([
+        const [subcontractorsRes, projectsRes, schedulesRes, messagesRes, historyRes, tasksRes] = await Promise.all([
           fetch("/api/subcontractors"),
           fetch("/api/projects"),
           fetch("/api/schedules"),
           fetch("/api/messages/automated"),
           fetch("/api/messages/history"),
-          fetch("/api/messages/replies"),
+          // fetch("/api/messages/replies"),
           fetch("/api/tasks"),
         ]);
 
@@ -456,10 +462,10 @@ export default function Messaging() {
           const errorText = await historyRes.text();
           errors.push(`History API failed: ${historyRes.status} ${historyRes.statusText} - ${errorText}`);
         }
-        if (!repliesRes.ok) {
-          const errorText = await repliesRes.text();
-          errors.push(`Replies API failed: ${repliesRes.status} ${repliesRes.statusText} - ${errorText}`);
-        }
+        // if (!repliesRes.ok) {
+        //   const errorText = await repliesRes.text();
+        //   errors.push(`Replies API failed: ${repliesRes.status} ${repliesRes.statusText} - ${errorText}`);
+        // }
         if (!tasksRes.ok) {
           const errorText = await schedulesRes.text();
           errors.push(`Tasks API failed: ${tasksRes.status} ${tasksRes.statusText} - ${errorText}`);
@@ -475,7 +481,7 @@ export default function Messaging() {
         const schedulesData = await schedulesRes.json();
         const messagesData = await messagesRes.json();
         const historyData = await historyRes.json();
-        const repliesData = await repliesRes.json();
+        // const repliesData = await repliesRes.json();
         const tasksData = await tasksRes.json();
 
         console.log("Subcontractors Data:", subcontractorsData);
@@ -486,7 +492,7 @@ export default function Messaging() {
         setSchedules(schedulesData);
         setMessages(messagesData);
         setMessageHistory(historyData);
-        setReplies(repliesData);
+        // setReplies(repliesData);
         setTasks(tasksData);
       } catch (error) {
         console.error("Error fetching data:", error);
@@ -518,7 +524,7 @@ export default function Messaging() {
     try {
       const content = newMessage.type === "update"
         ? defaultMessages.update.replace("{CustomContent}", newMessage.customContent)
-        : defaultMessages[newMessage.type];
+        : defaultMessages[newMessage.type as keyof typeof defaultMessages];
 
       const response = await fetch("/api/messages/automated", {
         method: "POST",
@@ -636,7 +642,7 @@ export default function Messaging() {
             <li>
               <button
                 onClick={() => router.push("/auth/dashboard#projects")}
-                className={pathname.includes("#projects") ? "active" : ""}
+                className={pathname?.includes("#projects") ? "active" : ""}
               >
                 <FolderKanban className="sidebar-icon" />
                 <span>Projects</span>
@@ -645,7 +651,7 @@ export default function Messaging() {
             <li>
               <button
                 onClick={() => router.push("/auth/dashboard#tasks")}
-                className={pathname.includes("#tasks") ? "active" : ""}
+                className={pathname?.includes("#tasks") ? "active" : ""}
               >
                 <FileText className="sidebar-icon" />
                 <span>Tasks</span>
@@ -654,7 +660,7 @@ export default function Messaging() {
             <li>
               <button
                 onClick={() => router.push("/auth/dashboard#calendar")}
-                className={pathname.includes("#calendar") ? "active" : ""}
+                className={pathname?.includes("#calendar") ? "active" : ""}
               >
                 <Calendar className="sidebar-icon" />
                 <span>Calendar</span>
@@ -663,7 +669,7 @@ export default function Messaging() {
             <li>
               <button
                 onClick={() => router.push("/auth/dashboard#profile")}
-                className={pathname.includes("#profile") ? "active" : ""}
+                className={pathname?.includes("#profile") ? "active" : ""}
               >
                 <User className="sidebar-icon" />
                 <span>Profile</span>
@@ -672,7 +678,7 @@ export default function Messaging() {
             <li>
               <button
                 onClick={() => router.push("/auth/dashboard#settings")}
-                className={pathname.includes("#settings") ? "active" : ""}
+                className={pathname?.includes("#settings") ? "active" : ""}
               >
                 <Settings className="sidebar-icon" />
                 <span>Settings</span>
@@ -757,7 +763,7 @@ export default function Messaging() {
                       <div className="add-task-grid">
                         <div>
                           <Select
-                            onValueChange={setSelectedProject}
+                            onValueChange={(value) => setSelectedProject(value as string)}
                             value={selectedProject}
                             options={projectOptions}
                           >
@@ -835,7 +841,7 @@ export default function Messaging() {
                         <div className="add-task-grid">
                           <div>
                             <Select
-                              onValueChange={(value) => setNewMessage({ ...newMessage, type: value })}
+                              onValueChange={(value: string | string[]) => setNewMessage({ ...newMessage, type: Array.isArray(value) ? value[0] : value })}
                               value={newMessage.type}
                               options={messageTypeOptions}
                             >
@@ -855,7 +861,7 @@ export default function Messaging() {
                         <div className="add-task-grid">
                           <div>
                             <Select
-                              onValueChange={(value) => setNewMessage({ ...newMessage, projectId: value })}
+                              onValueChange={(value) => setNewMessage({ ...newMessage, projectId: Array.isArray(value) ? value[0] : value })}
                               value={newMessage.projectId}
                               options={projectOptions}
                             >
@@ -875,7 +881,7 @@ export default function Messaging() {
                         <div className="add-task-grid">
                           <div>
                             <Select
-                              onValueChange={(value) => setNewMessage({ ...newMessage, subcontractorIds: value })}
+                              onValueChange={(value) => setNewMessage({ ...newMessage, subcontractorIds: Array.isArray(value) ? value : [value] })}
                               value={newMessage.subcontractorIds}
                               options={subcontractorOptions}
                               multiple
@@ -934,7 +940,7 @@ export default function Messaging() {
                                   onValueChange={(value) =>
                                     setNewMessage({
                                       ...newMessage,
-                                      trigger: { type: "schedule-based", offset: value },
+                                      trigger: { type: "schedule-based", offset: Array.isArray(value) ? value[0] : value },
                                     })
                                   }
                                   value={newMessage.trigger.offset}

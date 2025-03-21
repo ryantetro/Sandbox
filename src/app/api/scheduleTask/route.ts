@@ -1,4 +1,3 @@
-import prisma from "@/lib/prisma";
 import { NextResponse } from "next/server";
 import nodemailer from 'nodemailer';
 
@@ -9,6 +8,15 @@ const transporter = nodemailer.createTransport({
     pass: process.env.EMAIL_PASS,
   },
 });
+
+interface Subcontractor {
+  id: string;
+  name: string;
+  phone: string;
+  projects: string[];
+  role?: string;
+  status: string;
+}
 
 export async function POST(request: Request) {
   try {
@@ -24,7 +32,7 @@ export async function POST(request: Request) {
 
     // Format the subcontractors for the email
     const subcontractorList = subcontractorsToSchedule
-      .map((sub: any) => `${sub.name} (${sub.role || "N/A"}) (${sub.phone || "N/A"})`)
+      .map((sub: Subcontractor) => `${sub.name} (${sub.role || "N/A"}) (${sub.phone || "N/A"})`)
       .join("\n      ");
 
     const emailContent = `

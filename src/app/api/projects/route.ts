@@ -42,7 +42,7 @@ export async function POST(request: Request) {
     const user = await prisma.user.findUnique({
       where: { id: session.user.id as string },
     });
-    const { name, jobSiteAddress, subcontractorIds } = await request.json();
+    const { name, jobSiteAddress } = await request.json();
     if (!name || !jobSiteAddress) {
       return NextResponse.json({ error: "Missing required fields" }, { status: 400 });
     }
@@ -50,7 +50,6 @@ export async function POST(request: Request) {
       data: {
         name,
         jobSiteAddress,
-        subcontractorIds: subcontractorIds || [],
         userId: user?.id as string
       },
     });
@@ -61,33 +60,33 @@ export async function POST(request: Request) {
   }
 }
 
-export async function PATCH(request: Request) {
-  try {
-    const { id, subcontractorIds } = await request.json();
-    if (!id || !subcontractorIds) {
-      return NextResponse.json({ error: "Missing required fields" }, { status: 400 });
-    }
+// export async function PATCH(request: Request) {
+//   try {
+//     const { id, subcontractorIds } = await request.json();
+//     if (!id || !subcontractorIds) {
+//       return NextResponse.json({ error: "Missing required fields" }, { status: 400 });
+//     }
 
-    // Check if the project exists
-    const project = await prisma.project.findUnique({
-      where: { id },
-    });
+//     // Check if the project exists
+//     const project = await prisma.project.findUnique({
+//       where: { id },
+//     });
 
-    if (!project) {
-      return NextResponse.json({ error: "Project not found" }, { status: 404 });
-    }
+//     if (!project) {
+//       return NextResponse.json({ error: "Project not found" }, { status: 404 });
+//     }
 
-    // Update the project with the new subcontractorIds
-    const updatedProject = await prisma.project.update({
-      where: { id },
-      data: {
-        subcontractorIds,
-      },
-    });
+//     // Update the project with the new subcontractorIds
+//     const updatedProject = await prisma.project.update({
+//       where: { id },
+//       data: {
+//         subcontractorIds,
+//       },
+//     });
 
-    return NextResponse.json(updatedProject);
-  } catch (error) {
-    console.error("PATCH /api/projects error:", error);
-    return NextResponse.json({ error: "Failed to update project" }, { status: 500 });
-  }
-}
+//     return NextResponse.json(updatedProject);
+//   } catch (error) {
+//     console.error("PATCH /api/projects error:", error);
+//     return NextResponse.json({ error: "Failed to update project" }, { status: 500 });
+//   }
+// }
