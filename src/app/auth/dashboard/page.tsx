@@ -6,10 +6,23 @@ import { useSession, signOut } from "next-auth/react";
 import { Session } from "next-auth";
 import { useRouter } from "next/navigation";
 import { FaProjectDiagram, FaTimes } from "react-icons/fa";
-import { Bell, Calendar, ChevronDown, ChevronUp, FileText, Home, LogOut, Menu, MessageSquare, Settings, User, X, FolderKanban, Kanban, Hammer, MapPin, Users, Plus, Save } from "lucide-react";
+import { Bell, Calendar, ChevronDown, ChevronUp, FileText, Home, LogOut, Menu, MessageSquare, Settings, User, X, FolderKanban, Kanban, Hammer, MapPin, Users, Plus, Save, Clock, AlertTriangle, CheckCircle } from "lucide-react";
 import Link from "next/link";
 import "../styles/dashboard.css";
 import { DateTime } from "next-auth/providers/kakao";
+import { Calendar as BigCalendar, dateFnsLocalizer } from "react-big-calendar";
+import { format, parse, startOfWeek, getDay } from "date-fns";
+import enUS from "date-fns/locale/en-US";
+
+// Setup date-fns localizer for react-big-calendar
+const locales = { "en-US": enUS };
+const localizer = dateFnsLocalizer({
+  format,
+  parse,
+  startOfWeek: () => startOfWeek(new Date(), { weekStartsOn: 1 }),
+  getDay,
+  locales,
+});
 
 // Extend the Session type to include companyName and role
 declare module "next-auth" {
@@ -27,8 +40,8 @@ declare module "next-auth" {
 
 enum TaskStatus {
   pending = "pending",
-  IN_PROGRESS = "IN_PROGRESS",
-  COMPLETED = "COMPLETED",
+  IN_PROGRESS = "in_progress", // Match the schema's TaskStatus enum
+  COMPLETED = "completed",
 }
 
 enum TaskPriority {
@@ -42,8 +55,8 @@ interface Task {
   description: string;
   status: TaskStatus;
   priority?: TaskPriority;
-  startDate?: DateTime;
-  endDate?: DateTime;
+  startDate?: string; // Updated to string to match API response
+  endDate?: string;
   projectId: string;
   subcontractorIds?: string[];
 }
@@ -62,6 +75,7 @@ interface Project {
   name: string;
   jobSiteAddress: string;
   taskIds: string[];
+  subcontractorIds?: string[];
 }
 
 interface Schedule {
@@ -83,6 +97,7 @@ export default function Dashboard() {
   const router = useRouter();
 
   const [selectedProject, setSelectedProject] = useState("");
+  const [calendarProjectFilter, setCalendarProjectFilter] = useState("all"); // Filter for calendar
   const [subcontractors, setSubcontractors] = useState<Subcontractor[]>([]);
   const [schedules, setSchedules] = useState<Schedule[]>([]);
   const [projects, setProjects] = useState<Project[]>([]);
@@ -90,15 +105,15 @@ export default function Dashboard() {
   const [newTask, setNewTask] = useState("");
   const [newTaskDueDate, setNewTaskDueDate] = useState("");
   const [newTaskPriority, setNewTaskPriority] = useState<"low" | "medium" | "high">("low");
-  const [newTaskProjectId, setNewTaskProjectId] = useState(""); // New: Selected project ID
-  const [newTaskStartDate, setNewTaskStartDate] = useState(""); // New: Start date
-  const [newTaskSubcontractorIds, setNewTaskSubcontractorIds] = useState<string[]>([]); // New: Selected subcontractor IDs
-  const [isAddSubcontractorFormOpen, setIsAddSubcontractorFormOpen] = useState(false); // New: Toggle for adding a new subcontractor
+  const [newTaskProjectId, setNewTaskProjectId] = useState("");
+  const [newTaskStartDate, setNewTaskStartDate] = useState("");
+  const [newTaskSubcontractorIds, setNewTaskSubcontractorIds] = useState<string[]>([]);
+  const [isAddSubcontractorFormOpen, setIsAddSubcontractorFormOpen] = useState(false);
   const [newSubcontractor, setNewSubcontractor] = useState({
     name: "",
     role: "",
     phone: "",
-  }); // New: Form data for adding a new subcontractor
+  });
   const [error, setError] = useState<string | null>(null);
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
   const [activeSection, setActiveSection] = useState("dashboard");
@@ -121,56 +136,56 @@ export default function Dashboard() {
   }, [status, router]);
 
   // Fetch data on component mount
-    useEffect(() => {
-      const fetchData = async () => {
-        try {
-          const [subcontractorsRes, projectsRes, schedulesRes, tasksRes] = await Promise.all([
-            fetch("/api/subcontractors"),
-            fetch("/api/projects"),
-            fetch("/api/schedules"),
-            fetch("/api/tasks")
-          ]);
-  
-          const errors: string[] = [];
-          if (!subcontractorsRes.ok) {
-            const errorText = await subcontractorsRes.text();
-            errors.push(`Subcontractors API failed: ${subcontractorsRes.status} ${subcontractorsRes.statusText} - ${errorText}`);
-          }
-          if (!projectsRes.ok) {
-            const errorText = await projectsRes.text();
-            errors.push(`Projects API failed: ${projectsRes.status} ${projectsRes.statusText} - ${errorText}`);
-          }
-          if (!schedulesRes.ok) {
-            const errorText = await schedulesRes.text();
-            errors.push(`Schedules API failed: ${schedulesRes.status} ${schedulesRes.statusText} - ${errorText}`);
-          }
-          if (!tasksRes.ok) {
-            const errorText = await schedulesRes.text();
-            errors.push(`Tasks API failed: ${tasksRes.status} ${tasksRes.statusText} - ${errorText}`);
-          }
-  
-          if (errors.length > 0) {
-            console.error("API Errors:", errors);
-            throw new Error(errors.join("\n"));
-          }
-  
-          const subcontractorsData = await subcontractorsRes.json();
-          const projectsData = await projectsRes.json();
-          const schedulesData = await schedulesRes.json();
-          const tasksData = await tasksRes.json();
-  
-          setSubcontractors(subcontractorsData);
-          setProjects(projectsData);
-          setSchedules(schedulesData);
-          setTasks(tasksData)
-        } catch (error) {
-          console.error("Error fetching data:", error);
-          setError(error instanceof Error ? error.message : "Failed to load data. Please try again later.");
+  useEffect(() => {
+    const fetchData = async () => {
+      try {
+        const [subcontractorsRes, projectsRes, schedulesRes, tasksRes] = await Promise.all([
+          fetch("/api/subcontractors"),
+          fetch("/api/projects"),
+          fetch("/api/schedules"),
+          fetch("/api/tasks"),
+        ]);
+
+        const errors: string[] = [];
+        if (!subcontractorsRes.ok) {
+          const errorText = await subcontractorsRes.text();
+          errors.push(`Subcontractors API failed: ${subcontractorsRes.status} ${subcontractorsRes.statusText} - ${errorText}`);
         }
-      };
-  
-      fetchData();
-    }, []);
+        if (!projectsRes.ok) {
+          const errorText = await projectsRes.text();
+          errors.push(`Projects API failed: ${projectsRes.status} ${projectsRes.statusText} - ${errorText}`);
+        }
+        if (!schedulesRes.ok) {
+          const errorText = await schedulesRes.text();
+          errors.push(`Schedules API failed: ${schedulesRes.status} ${schedulesRes.statusText} - ${errorText}`);
+        }
+        if (!tasksRes.ok) {
+          const errorText = await tasksRes.text();
+          errors.push(`Tasks API failed: ${tasksRes.status} ${tasksRes.statusText} - ${errorText}`);
+        }
+
+        if (errors.length > 0) {
+          console.error("API Errors:", errors);
+          throw new Error(errors.join("\n"));
+        }
+
+        const subcontractorsData = await subcontractorsRes.json();
+        const projectsData = await projectsRes.json();
+        const schedulesData = await schedulesRes.json();
+        const tasksData = await tasksRes.json();
+
+        setSubcontractors(subcontractorsData);
+        setProjects(projectsData);
+        setSchedules(schedulesData);
+        setTasks(tasksData);
+      } catch (error) {
+        console.error("Error fetching data:", error);
+        setError(error instanceof Error ? error.message : "Failed to load data. Please try again later.");
+      }
+    };
+
+    fetchData();
+  }, []);
 
   // Show a loading state while session is being fetched
   if (status === "loading") {
@@ -188,12 +203,12 @@ export default function Dashboard() {
       setError("Please select a project for the task.");
       return;
     }
-  
+
     if (!newTask.trim()) {
       setError("Task description is required.");
       return;
     }
-  
+
     try {
       const response = await fetch("/api/tasks", {
         method: "POST",
@@ -202,46 +217,89 @@ export default function Dashboard() {
         },
         body: JSON.stringify({
           description: newTask,
-          status: "pending", // Matches the TaskStatus enum in the database
+          status: "pending",
           priority: newTaskPriority || undefined,
           startDate: newTaskStartDate ? new Date(newTaskStartDate).toISOString() : undefined,
           endDate: newTaskDueDate ? new Date(newTaskDueDate).toISOString() : undefined,
           projectId: newTaskProjectId,
           subcontractorIds: newTaskSubcontractorIds,
-          createdBy: session?.user?.id, // Include the userId from the session
+          userId: session?.user?.id,
         }),
-        credentials: "include", // Include cookies for authentication
+        credentials: "include",
       });
-  
+
       if (!response.ok) {
         const errorText = await response.text();
         throw new Error(`Failed to create task: ${response.status} ${response.statusText} - ${errorText}`);
       }
-  
+
       const createdTask = await response.json();
-      setTasks([...tasks, createdTask]); // Add the new task to the state
-      // Reset the form
+      setTasks([...tasks, createdTask]);
       setNewTask("");
       setNewTaskDueDate("");
       setNewTaskPriority("medium");
       setNewTaskProjectId("");
       setNewTaskStartDate("");
       setNewTaskSubcontractorIds([]);
-      setError(null); // Clear any previous errors
+      setError(null);
     } catch (err) {
       console.error("Error creating task:", err);
       setError(err instanceof Error ? err.message : "Failed to create task. Please try again.");
     }
   };
 
+  // Handle task status update
+  const handleTaskStatusUpdate = async (taskId: string, newStatus: TaskStatus) => {
+    try {
+      const response = await fetch("/api/tasks", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          id: taskId,
+          status: newStatus,
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error("Failed to update task");
+      }
+
+      const updatedTask = await response.json();
+      setTasks(tasks.map((t) => (t.id === taskId ? updatedTask : t)));
+    } catch (error) {
+      console.error("Error updating task:", error);
+      setError("Failed to update task. Please try again.");
+    }
+  };
+
+  // Handle deleting a task
+  const handleDeleteTask = async (taskId: string) => {
+    try {
+      const response = await fetch("/api/tasks", {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id: taskId }),
+      });
+
+      if (!response.ok) {
+        throw new Error("Failed to delete task");
+      }
+
+      setTasks(tasks.filter((task) => task.id !== taskId));
+    } catch (error) {
+      console.error("Error deleting task:", error);
+      setError("Failed to delete task. Please try again.");
+    }
+  };
+
   const handleAddSubcontractor = async (e: React.FormEvent) => {
     e.preventDefault();
-  
+
     if (!newSubcontractor.name.trim()) {
       setError("Subcontractor name is required.");
       return;
     }
-  
+
     try {
       const response = await fetch("/api/subcontractors", {
         method: "POST",
@@ -252,38 +310,65 @@ export default function Dashboard() {
           name: newSubcontractor.name,
           role: newSubcontractor.role || undefined,
           phone: newSubcontractor.phone || undefined,
-          userId: session?.user?.id, // Include the userId from the session
+          userId: session?.user?.id,
         }),
-        credentials: "include", // Include cookies for authentication
+        credentials: "include",
       });
-  
+
       if (!response.ok) {
         const errorText = await response.text();
         throw new Error(`Failed to create subcontractor: ${response.status} ${response.statusText} - ${errorText}`);
       }
-  
+
       const createdSubcontractor = await response.json();
-      setSubcontractors([...subcontractors, createdSubcontractor]); // Add the new subcontractor to the state
-      setNewTaskSubcontractorIds([...newTaskSubcontractorIds, createdSubcontractor.id]); // Automatically select the new subcontractor
-      setNewSubcontractor({ name: "", role: "", phone: "" }); // Reset the form
-      setIsAddSubcontractorFormOpen(false); // Close the form
-      setError(null); // Clear any previous errors
+      setSubcontractors([...subcontractors, createdSubcontractor]);
+      setNewTaskSubcontractorIds([...newTaskSubcontractorIds, createdSubcontractor.id]);
+      setNewSubcontractor({ name: "", role: "", phone: "" });
+      setIsAddSubcontractorFormOpen(false);
+      setError(null);
     } catch (err) {
       console.error("Error creating subcontractor:", err);
       setError(err instanceof Error ? err.message : "Failed to create subcontractor. Please try again.");
     }
   };
 
-  // Handle task completion toggle
-  const handleTaskCompletion = (taskId: string) => {
-    setTasks(tasks.map((task) =>
-      task.id === taskId ? { ...task, status: task.status !== TaskStatus.COMPLETED ? TaskStatus.COMPLETED : TaskStatus.pending } : task
-    ));
-  };
+  const handleAddProject = async (e: React.FormEvent) => {
+    e.preventDefault();
 
-  // Handle deleting a task
-  const handleDeleteTask = (taskId: string) => {
-    setTasks(tasks.filter((task) => task.id !== taskId));
+    if (!newProject.name.trim() || !newProject.jobSiteAddress.trim()) {
+      setError("Project name and address are required.");
+      return;
+    }
+
+    try {
+      const response = await fetch("/api/projects", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          name: newProject.name,
+          jobSiteAddress: newProject.jobSiteAddress,
+          subcontractorIds: newProject.subcontractorIds,
+          userId: session?.user?.id,
+        }),
+        credentials: "include",
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(`Failed to create project: ${response.status} ${response.statusText} - ${errorText}`);
+      }
+
+      const createdProject = await response.json();
+      setProjects([...projects, createdProject]);
+      setNewProject({ name: "", jobSiteAddress: "", subcontractorIds: [] });
+      setIsAddProjectModalOpen(false);
+      setError(null);
+    } catch (err) {
+      console.error("Error creating project:", err);
+      setError(err instanceof Error ? err.message : "Failed to create project. Please try again.");
+    }
   };
 
   // Handle logout
@@ -298,46 +383,7 @@ export default function Dashboard() {
     ));
   };
 
-  const handleAddProject = async (e: React.FormEvent) => {
-    e.preventDefault();
-  
-    if (!newProject.name.trim() || !newProject.jobSiteAddress.trim()) {
-      setError("Project name and address are required.");
-      return;
-    }
-  
-    try {
-      const response = await fetch("/api/projects", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          name: newProject.name,
-          jobSiteAddress: newProject.jobSiteAddress,
-          subcontractorIds: newProject.subcontractorIds,
-          userId: session?.user?.id, // Include the userId from the session
-        }),
-        credentials: "include", // Include cookies for authentication
-      });
-  
-      if (!response.ok) {
-        const errorText = await response.text();
-        throw new Error(`Failed to create project: ${response.status} ${response.statusText} - ${errorText}`);
-      }
-  
-      const createdProject = await response.json();
-      setProjects([...projects, createdProject]); // Add the new project to the state
-      setNewProject({ name: "", jobSiteAddress: "", subcontractorIds: [] }); // Reset the form
-      setIsAddProjectModalOpen(false); // Close the modal
-      setError(null); // Clear any previous errors
-    } catch (err) {
-      console.error("Error creating project:", err);
-      setError(err instanceof Error ? err.message : "Failed to create project. Please try again.");
-    }
-  };
-
-  // Get priority color class (now handled in CSS)
+  // Get priority color class
   const getPriorityClass = (priority?: "low" | "medium" | "high") => {
     return priority ? `task-priority ${priority}` : "task-priority";
   };
@@ -351,9 +397,9 @@ export default function Dashboard() {
   };
 
   // Get tasks count by status
-  const completedTasks = tasks.filter((task) => task.status === "COMPLETED").length;
-  const pendingTasks = tasks.filter((task) => task.status != "COMPLETED").length;
-  const overdueTasks = tasks.filter((task) => task.status != "COMPLETED" && isOverdue(task.endDate)).length;
+  const completedTasks = tasks.filter((task) => task.status === "completed").length;
+  const pendingTasks = tasks.filter((task) => task.status !== "completed").length;
+  const overdueTasks = tasks.filter((task) => task.status !== "completed" && isOverdue(task.endDate)).length;
 
   const currentTasks = tasks.filter((task) => task.startDate && new Date(task.startDate) <= new Date());
   const upcomingTasks = tasks.filter((task) => task.startDate && new Date(task.startDate) > new Date());
@@ -361,6 +407,89 @@ export default function Dashboard() {
 
   // Calculate progress percentage for the progress bar
   const progressPercentage = tasks.length > 0 ? (completedTasks / tasks.length) * 100 : 0;
+
+  // Calendar Events: Combine tasks and schedules
+  const calendarEvents = [
+    // Tasks as events
+    ...tasks
+      .filter((task) => {
+        if (calendarProjectFilter === "all") return true;
+        return task.projectId === calendarProjectFilter;
+      })
+      .filter((task) => task.startDate && task.endDate) // Only include tasks with start and end dates
+      .map((task) => {
+        const start = new Date(task.startDate!);
+        const end = new Date(task.endDate!);
+        // Ensure dates are valid
+        if (isNaN(start.getTime()) || isNaN(end.getTime())) {
+          console.warn(`Invalid dates for task ${task.id}:`, task.startDate, task.endDate);
+          return null;
+        }
+        return {
+          id: `task-${task.id}`,
+          title: `Task: ${task.description} (${projects.find((p) => p.id === task.projectId)?.name || "Unknown"})`,
+          start,
+          end,
+          allDay: false,
+          resource: {
+            type: "task",
+            priority: task.priority,
+            status: task.status,
+          },
+        };
+      })
+      .filter((event) => event !== null), // Remove invalid events
+    // Schedules as events
+    ...schedules
+      .filter((schedule) => {
+        if (calendarProjectFilter === "all") return true;
+        return schedule.projectId === calendarProjectFilter;
+      })
+      .map((schedule) => {
+        const subcontractor = subcontractors.find((sub) => sub.id === schedule.subcontractorId);
+        const project = projects.find((proj) => proj.id === schedule.projectId);
+        const dateTimeStr = `${schedule.date} ${schedule.time}`;
+        const eventDate = new Date(dateTimeStr);
+        if (isNaN(eventDate.getTime())) {
+          console.warn(`Invalid date for schedule ${schedule.id}:`, dateTimeStr);
+          return null;
+        }
+        return {
+          id: `schedule-${schedule.id}`,
+          title: `Schedule: ${subcontractor?.name || "Unknown"} @ ${project?.name || "Unknown"}`,
+          start: eventDate,
+          end: eventDate, // Schedules are point-in-time events
+          allDay: false,
+          resource: {
+            type: "schedule",
+            confirmed: schedule.confirmed,
+          },
+        };
+      })
+      .filter((event) => event !== null), // Remove invalid events
+  ];
+
+  // Log events for debugging
+  console.log("Calendar Events:", calendarEvents);
+
+  // Analytics for Calendar Section
+  const filteredTasks = tasks.filter((task) => {
+    if (calendarProjectFilter === "all") return true;
+    return task.projectId === calendarProjectFilter;
+  });
+
+  const filteredUpcomingTasks = filteredTasks.filter((task) => {
+    if (!task.endDate) return false;
+    const due = new Date(task.endDate);
+    const now = new Date();
+    const diff = due.getTime() - now.getTime();
+    return diff > 0 && diff <= 7 * 24 * 60 * 60 * 1000; // Within 7 days
+  }).length;
+
+  const filteredOverdueTasks = filteredTasks.filter((task) => task.status !== "completed" && isOverdue(task.endDate)).length;
+
+  const filteredCompletedTasks = filteredTasks.filter((task) => task.status === "completed").length;
+  const completionPercentage = filteredTasks.length > 0 ? (filteredCompletedTasks / filteredTasks.length) * 100 : 0;
 
   return (
     <div className="dashboard-container">
@@ -470,7 +599,6 @@ export default function Dashboard() {
         <header className="header">
           <div className="header-content">
             <div>
-              {/* Add Welcome Message */}
               {activeSection === "dashboard" && (
                 <p className="welcome-message">
                   Welcome back, {session?.user?.email || "User"}!
@@ -525,7 +653,6 @@ export default function Dashboard() {
                     <span className="separator">|</span>
                     <span className="pending">{pendingTasks} pending</span>
                   </div>
-                  {/* Add Progress Bar */}
                   <div className="progress-bar">
                     <div
                       className="progress-fill"
@@ -562,16 +689,18 @@ export default function Dashboard() {
                     {currentTasks.slice(0, 3).map((task) => (
                       <li key={task.id} className="task-item">
                         <div style={{ display: "flex", alignItems: "center" }}>
-                          <input
-                            type="checkbox"
-                            checked={task.status === "COMPLETED"}
-                            onChange={() => handleTaskCompletion(task.id)}
-                          />
-                          {/* Add Priority Dot */}
+                          <select
+                            value={task.status}
+                            onChange={(e) => handleTaskStatusUpdate(task.id, e.target.value as TaskStatus)}
+                          >
+                            <option value="pending">Pending</option>
+                            <option value="in_progress">In Progress</option>
+                            <option value="completed">Completed</option>
+                          </select>
                           {task.priority && (
                             <span className={`priority-dot ${task.priority}`}></span>
                           )}
-                          <span className={`task-text ${task.status === "COMPLETED" ? "completed" : ""}`}>
+                          <span className={`task-text ${task.status === "completed" ? "completed" : ""}`}>
                             {task.description}
                           </span>
                           {task.priority && (
@@ -581,7 +710,7 @@ export default function Dashboard() {
                           )}
                         </div>
                         {task.endDate && (
-                          <span className={`task-due-date ${isOverdue(task.endDate) && task.status != "COMPLETED" ? "overdue" : ""}`}>
+                          <span className={`task-due-date ${isOverdue(task.endDate) && task.status !== "completed" ? "overdue" : ""}`}>
                             Due: {new Date(task.endDate).toLocaleDateString()}
                           </span>
                         )}
@@ -613,16 +742,18 @@ export default function Dashboard() {
                     {upcomingTasks.slice(0, 3).map((task) => (
                       <li key={task.id} className="task-item">
                         <div style={{ display: "flex", alignItems: "center" }}>
-                          <input
-                            type="checkbox"
-                            checked={task.status === "COMPLETED"}
-                            onChange={() => handleTaskCompletion(task.id)}
-                          />
-                          {/* Add Priority Dot */}
+                          <select
+                            value={task.status}
+                            onChange={(e) => handleTaskStatusUpdate(task.id, e.target.value as TaskStatus)}
+                          >
+                            <option value="pending">Pending</option>
+                            <option value="in_progress">In Progress</option>
+                            <option value="completed">Completed</option>
+                          </select>
                           {task.priority && (
                             <span className={`priority-dot ${task.priority}`}></span>
                           )}
-                          <span className={`task-text ${task.status === "COMPLETED" ? "completed" : ""}`}>
+                          <span className={`task-text ${task.status === "completed" ? "completed" : ""}`}>
                             {task.description}
                           </span>
                           {task.priority && (
@@ -632,7 +763,7 @@ export default function Dashboard() {
                           )}
                         </div>
                         {task.startDate && (
-                          <span className={`task-due-date ${isOverdue(task.startDate) && task.status != "COMPLETED" ? "overdue" : ""}`}>
+                          <span className={`task-due-date ${isOverdue(task.startDate) && task.status !== "completed" ? "overdue" : ""}`}>
                             Scheduled Start Date: {new Date(task.startDate).toLocaleDateString()}
                           </span>
                         )}
@@ -659,16 +790,18 @@ export default function Dashboard() {
                     {needsScheduling.slice(0, 3).map((task) => (
                       <li key={task.id} className="task-item">
                         <div style={{ display: "flex", alignItems: "center" }}>
-                          <input
-                            type="checkbox"
-                            checked={task.status === "COMPLETED"}
-                            onChange={() => handleTaskCompletion(task.id)}
-                          />
-                          {/* Add Priority Dot */}
+                          <select
+                            value={task.status}
+                            onChange={(e) => handleTaskStatusUpdate(task.id, e.target.value as TaskStatus)}
+                          >
+                            <option value="pending">Pending</option>
+                            <option value="in_progress">In Progress</option>
+                            <option value="completed">Completed</option>
+                          </select>
                           {task.priority && (
                             <span className={`priority-dot ${task.priority}`}></span>
                           )}
-                          <span className={`task-text ${task.status === "COMPLETED" ? "completed" : ""}`}>
+                          <span className={`task-text ${task.status === "completed" ? "completed" : ""}`}>
                             {task.description}
                           </span>
                           {task.priority && (
@@ -677,11 +810,6 @@ export default function Dashboard() {
                             </span>
                           )}
                         </div>
-                        {task.startDate && (
-                          <span className={`task-due-date ${isOverdue(task.startDate) && task.status != "COMPLETED" ? "overdue" : ""}`}>
-                            Scheduled Start Date: {new Date(task.startDate).toLocaleDateString()}
-                          </span>
-                        )}
                         {!task.startDate && (
                           <span className="task-due-date">
                             No Scheduled Start Date
@@ -731,7 +859,6 @@ export default function Dashboard() {
           {/* Projects Section */}
           {activeSection === "projects" && (
             <div style={{ display: "flex", flexDirection: "column", gap: "1.5rem" }}>
-              {/* Project List Card */}
               <div className="section add-project-form">
                 <div className="section-header">
                   <h3 className="add-task-title">Projects</h3>
@@ -785,7 +912,6 @@ export default function Dashboard() {
                 </div>
               </div>
 
-              {/* Project Details Card (only shown when a project is selected) */}
               {selectedProject && (
                 <div className="section">
                   <div className="task-list-header">
@@ -825,7 +951,7 @@ export default function Dashboard() {
                           <div className="project-details-section">
                             <h4>Tasks</h4>
                             {projectTasks.length === 0 ? (
-                              <p>No subcontractors assigned.</p>
+                              <p>No tasks assigned.</p>
                             ) : (
                               <ul className="subcontractor-list">
                                 {projectTasks.map((task) => (
@@ -840,6 +966,33 @@ export default function Dashboard() {
                               </ul>
                             )}
                           </div>
+
+                          <div className="project-details-section">
+                            <h4>Schedules</h4>
+                            {projectSchedules.length === 0 ? (
+                              <p>No schedules set.</p>
+                            ) : (
+                              <ul className="schedule-list">
+                                {projectSchedules.map((schedule) => {
+                                  const sub = subcontractors.find(
+                                    (s) => s.id === schedule.subcontractorId
+                                  );
+                                  return (
+                                    <li key={schedule.id}>
+                                      <Calendar
+                                        size={16}
+                                        style={{ marginRight: "8px", color: "#64748b" }}
+                                      />
+                                      <strong>{sub?.name || "Unknown"}:</strong>{" "}
+                                      {new Date(schedule.date).toLocaleDateString()} at{" "}
+                                      {schedule.time} -{" "}
+                                      {schedule.confirmed ? "Confirmed" : "Pending"}
+                                    </li>
+                                  );
+                                })}
+                              </ul>
+                            )}
+                          </div>
                         </div>
                       );
                     })()}
@@ -847,7 +1000,6 @@ export default function Dashboard() {
                 </div>
               )}
 
-              {/* Add Project Modal */}
               {isAddProjectModalOpen && (
                 <div className="add-project-modal">
                   <div className="add-project-modal-content">
@@ -947,7 +1099,6 @@ export default function Dashboard() {
                 <h3 className="add-task-title">Add New Task</h3>
 
                 <div className="add-task-grid">
-                  {/* Project Selection (Required) */}
                   <div className="form-group">
                     <label htmlFor="task-project">Project</label>
                     <select
@@ -966,7 +1117,6 @@ export default function Dashboard() {
                     </select>
                   </div>
 
-                  {/* Description (Required) */}
                   <div className="form-group">
                     <label htmlFor="task-description">Description</label>
                     <input
@@ -980,7 +1130,6 @@ export default function Dashboard() {
                     />
                   </div>
 
-                  {/* Start Date (Optional) */}
                   <div className="form-group">
                     <label htmlFor="task-start-date">Start Date</label>
                     <input
@@ -992,7 +1141,6 @@ export default function Dashboard() {
                     />
                   </div>
 
-                  {/* Due Date (Optional) */}
                   <div className="form-group">
                     <label htmlFor="task-due-date">Due Date</label>
                     <input
@@ -1004,7 +1152,6 @@ export default function Dashboard() {
                     />
                   </div>
 
-                  {/* Priority (Optional) */}
                   <div className="form-group">
                     <label htmlFor="task-priority">Priority</label>
                     <select
@@ -1022,7 +1169,6 @@ export default function Dashboard() {
                     </select>
                   </div>
 
-                  {/* Subcontractors (Optional) */}
                   <div className="form-group">
                     <label htmlFor="task-subcontractors">Subcontractors</label>
                     <select
@@ -1053,7 +1199,6 @@ export default function Dashboard() {
                   </div>
                 </div>
 
-                {/* Add New Subcontractor Form (Inline) */}
                 {isAddSubcontractorFormOpen && (
                   <div className="add-subcontractor-form">
                     <h4>Add New Subcontractor</h4>
@@ -1133,12 +1278,15 @@ export default function Dashboard() {
                     {tasks.map((task) => (
                       <li key={task.id} className="task-item">
                         <div className="task-item-details">
-                          <input
-                            type="checkbox"
-                            checked={task.status === "COMPLETED"}
-                            onChange={() => handleTaskCompletion(task.id)}
-                          />
-                          <span className={`task-text ${task.status === "COMPLETED" ? "completed" : ""}`}>
+                          <select
+                            value={task.status}
+                            onChange={(e) => handleTaskStatusUpdate(task.id, e.target.value as TaskStatus)}
+                          >
+                            <option value="pending">Pending</option>
+                            <option value="in_progress">In Progress</option>
+                            <option value="completed">Completed</option>
+                          </select>
+                          <span className={`task-text ${task.status === "completed" ? "completed" : ""}`}>
                             {task.description}
                           </span>
                           {task.priority && (
@@ -1149,13 +1297,20 @@ export default function Dashboard() {
                         </div>
 
                         <div className="task-actions">
+                          <span className="task-project">
+                            {projects.find((p) => p.id === task.projectId)?.name || "Unknown"}
+                          </span>
                           {task.endDate && (
-                            <span className={`task-due-date ${isOverdue(task.endDate) && task.status != "COMPLETED" ? "overdue" : ""}`}>
-                              {isOverdue(task.endDate) && task.status != "COMPLETED" ? "Overdue: " : "Due: "}
+                            <span className={`task-due-date ${isOverdue(task.endDate) && task.status !== "completed" ? "overdue" : ""}`}>
+                              {isOverdue(task.endDate) && task.status !== "completed" ? "Overdue: " : "Due: "}
                               {new Date(task.endDate).toLocaleDateString()}
                             </span>
                           )}
-
+                          <span className="task-subcontractors">
+                            Assigned to: {task.subcontractorIds?.length
+                              ? task.subcontractorIds.map((id) => subcontractors.find((sub) => sub.id === id)?.name || "Unknown").join(", ")
+                              : "None"}
+                          </span>
                           <button
                             onClick={() => handleDeleteTask(task.id)}
                             className="delete-button"
@@ -1177,11 +1332,103 @@ export default function Dashboard() {
             </div>
           )}
 
-          {/* Calendar Section - Placeholder */}
+          {/* Calendar Section */}
           {activeSection === "calendar" && (
-            <div className="section calendar-placeholder">
-              <h3 className="calendar-title">Calendar</h3>
-              <p className="calendar-message">Calendar view would be implemented here.</p>
+            <div style={{ display: "flex", flexDirection: "column", gap: "1.5rem" }}>
+              <div className="section">
+                <div className="section-header">
+                  <h3 className="section-title">Calendar</h3>
+                </div>
+                <div className="section-content">
+                  {/* Project Filter */}
+                  <div className="calendar-filter">
+                    <label htmlFor="calendar-project-filter" className="calendar-filter-label">
+                      Filter by Project:
+                    </label>
+                    <select
+                      id="calendar-project-filter"
+                      value={calendarProjectFilter}
+                      onChange={(e) => setCalendarProjectFilter(e.target.value)}
+                      className="add-task-input calendar-filter-select"
+                    >
+                      <option value="all">All Projects</option>
+                      {projects.map((project) => (
+                        <option key={project.id} value={project.id}>
+                          {project.name}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  {/* Calendar */}
+                  <BigCalendar
+                    localizer={localizer}
+                    events={calendarEvents}
+                    startAccessor="start"
+                    endAccessor="end"
+                    defaultView="month"
+                    views={["month", "week", "day"]}
+                    style={{ height: 600, marginTop: "1rem" }}
+                    eventPropGetter={(event) => ({
+                      className: `rbc-event ${
+                        event.resource.type === "task"
+                          ? (event.resource.priority || "medium") +
+                            " " +
+                            (event.resource.status === "completed" ? "completed" : "")
+                          : event.resource.type === "schedule"
+                          ? event.resource.confirmed
+                            ? "schedule-confirmed"
+                            : "schedule-pending"
+                          : ""
+                      }`,
+                    })}
+                    components={{
+                      event: (props) => {
+                        const { event } = props;
+                        return (
+                          <div className="rbc-event-content" title={event.title}>
+                            {event.title}
+                          </div>
+                        );
+                      },
+                    }}
+                    onSelectEvent={(event) => {
+                      if (event.resource.type === "task") {
+                        const taskId = event.id.replace("task-", "");
+                        const currentStatus = tasks.find((t) => t.id === taskId)?.status;
+                        const newStatus =
+                          currentStatus === "completed" ? "in_progress" : "completed";
+                        handleTaskStatusUpdate(taskId, newStatus);
+                      }
+                    }}
+                  />
+
+                  {/* Analytics Section */}
+                  <div className="analytics-grid">
+                    <div className="analytics-card">
+                      <Clock className="analytics-icon" />
+                      <div>
+                        <p className="analytics-value">{filteredUpcomingTasks}</p>
+                        <p className="analytics-label">Upcoming Tasks (Next 7 Days)</p>
+                      </div>
+                    </div>
+                    <div className="analytics-card">
+                      <AlertTriangle className="analytics-icon" />
+                      <div>
+                        <p className="analytics-value">{filteredOverdueTasks}</p>
+                        <p className="analytics-label">Overdue Tasks</p>
+                      </div>
+                    </div>
+                    <div className="analytics-card">
+                      <CheckCircle className="analytics-icon" />
+                      <div>
+                        <p className="analytics-value">{Math.round(completionPercentage)}%</p>
+                        <p className="analytics-label">Completion Rate</p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
             </div>
           )}
 
