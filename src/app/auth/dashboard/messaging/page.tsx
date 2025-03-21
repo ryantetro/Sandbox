@@ -7,6 +7,7 @@ import { useSession, signOut } from "next-auth/react";
 import { Session } from "next-auth";
 import { useRouter, usePathname } from "next/navigation";
 import { Bell, Calendar, ChevronDown, FileText, Home, LogOut, Menu, MessageSquare, Settings, User, X } from "lucide-react";
+import { FaProjectDiagram, FaTimes } from "react-icons/fa";
 import Link from "next/link";
 import "../../styles/dashboard.css";
 
@@ -598,6 +599,15 @@ export default function Messaging() {
               >
                 <MessageSquare className="sidebar-icon" />
                 <span>Messaging</span>
+              </button>
+            </li>
+            <li>
+              <button
+                onClick={() => router.push("/auth/dashboard#projects")}
+                className={pathname.includes("#projects") ? "active" : ""}
+              >
+                <FaProjectDiagram className="sidebar-icon" />
+                <span>Projects</span>
               </button>
             </li>
             <li>
