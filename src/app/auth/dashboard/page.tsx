@@ -1,3 +1,4 @@
+// src/app/auth/dashboard/page.tsx
 "use client";
 
 import { useState, useEffect } from "react";
@@ -5,7 +6,6 @@ import { useSession, signOut } from "next-auth/react";
 import { Session } from "next-auth";
 import { useRouter } from "next/navigation";
 import { Bell, Calendar, ChevronDown, FileText, Home, LogOut, Menu, MessageSquare, Settings, User, X } from "lucide-react";
-import Link from "next/link";
 import "../styles/dashboard.css";
 
 // Extend the Session type to include companyName and role
@@ -138,9 +138,8 @@ export default function Dashboard() {
   const pendingTasks = tasks.filter((task) => !task.completed).length;
   const overdueTasks = tasks.filter((task) => !task.completed && isOverdue(task.dueDate)).length;
 
-  function handleNavigation(arg0: string, arg1: string): void {
-    throw new Error("Function not implemented.");
-  }
+  // Calculate progress percentage for the progress bar
+  const progressPercentage = tasks.length > 0 ? (completedTasks / tasks.length) * 100 : 0;
 
   return (
     <div className="dashboard-container">
@@ -170,7 +169,7 @@ export default function Dashboard() {
                 onClick={() => setActiveSection("dashboard")}
                 className={activeSection === "dashboard" ? "active" : ""}
               >
-                <Home className="sidebar-icon"/>
+                <Home className="sidebar-icon" />
                 <span>Dashboard</span>
               </button>
             </li>
@@ -178,11 +177,11 @@ export default function Dashboard() {
               <button
                 onClick={() => {
                   setActiveSection("messaging");
-                  router.push("/auth/dashboard/messaging"); // Navigate to messaging page
+                  router.push("/auth/dashboard/messaging");
                 }}
                 className={activeSection === "messaging" ? "active" : ""}
               >
-                <MessageSquare className="sidebar-icon"/>
+                <MessageSquare className="sidebar-icon" />
                 <span>Messaging</span>
               </button>
             </li>
@@ -191,7 +190,7 @@ export default function Dashboard() {
                 onClick={() => setActiveSection("tasks")}
                 className={activeSection === "tasks" ? "active" : ""}
               >
-                <FileText className="sidebar-icon"/>
+                <FileText className="sidebar-icon" />
                 <span>Tasks</span>
               </button>
             </li>
@@ -200,7 +199,7 @@ export default function Dashboard() {
                 onClick={() => setActiveSection("calendar")}
                 className={activeSection === "calendar" ? "active" : ""}
               >
-                <Calendar className="sidebar-icon"/>
+                <Calendar className="sidebar-icon" />
                 <span>Calendar</span>
               </button>
             </li>
@@ -209,7 +208,7 @@ export default function Dashboard() {
                 onClick={() => setActiveSection("profile")}
                 className={activeSection === "profile" ? "active" : ""}
               >
-                <User className="sidebar-icon"/>
+                <User className="sidebar-icon" />
                 <span>Profile</span>
               </button>
             </li>
@@ -218,7 +217,7 @@ export default function Dashboard() {
                 onClick={() => setActiveSection("settings")}
                 className={activeSection === "settings" ? "active" : ""}
               >
-                <Settings className="sidebar-icon"/>
+                <Settings className="sidebar-icon" />
                 <span>Settings</span>
               </button>
             </li>
@@ -230,7 +229,7 @@ export default function Dashboard() {
             onClick={handleLogout}
             className="logout-button"
           >
-            <LogOut className="sidebar-icon"/>
+            <LogOut className="sidebar-icon" />
             <span>Logout</span>
           </button>
         </div>
@@ -241,6 +240,12 @@ export default function Dashboard() {
         <header className="header">
           <div className="header-content">
             <div>
+              {/* Add Welcome Message */}
+              {activeSection === "dashboard" && (
+                <p className="welcome-message">
+                  Welcome back, {session?.user?.email || "User"}!
+                </p>
+              )}
               <h2 className="header-title">
                 {activeSection === "dashboard" && "Dashboard Overview"}
                 {activeSection === "messaging" && "Messaging"}
@@ -254,7 +259,7 @@ export default function Dashboard() {
             <div className="header-right">
               <div className="relative">
                 <button className="notification-button">
-                  <Bell />
+                  <Bell className="sidebar-icon" />
                   {unreadNotificationsCount > 0 && (
                     <span className="notification-badge">
                       {unreadNotificationsCount}
@@ -270,7 +275,7 @@ export default function Dashboard() {
                 <span className="user-name">
                   {session?.user?.name || session?.user?.email}
                 </span>
-                <ChevronDown />
+                <ChevronDown className="sidebar-icon" />
               </div>
             </div>
           </div>
@@ -288,6 +293,13 @@ export default function Dashboard() {
                     <span className="completed">{completedTasks} completed</span>
                     <span className="separator">|</span>
                     <span className="pending">{pendingTasks} pending</span>
+                  </div>
+                  {/* Add Progress Bar */}
+                  <div className="progress-bar">
+                    <div
+                      className="progress-fill"
+                      style={{ width: `${progressPercentage}%` }}
+                    ></div>
                   </div>
                 </div>
 
@@ -324,6 +336,10 @@ export default function Dashboard() {
                             checked={task.completed}
                             onChange={() => handleTaskCompletion(task.id)}
                           />
+                          {/* Add Priority Dot */}
+                          {task.priority && (
+                            <span className={`priority-dot ${task.priority}`}></span>
+                          )}
                           <span className={`task-text ${task.completed ? "completed" : ""}`}>
                             {task.text}
                           </span>
@@ -475,7 +491,7 @@ export default function Dashboard() {
                             onClick={() => handleDeleteTask(task.id)}
                             className="delete-button"
                           >
-                            <X size={16} />
+                            <X className="sidebar-icon" />
                           </button>
                         </div>
                       </li>

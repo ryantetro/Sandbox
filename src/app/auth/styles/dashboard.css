@@ -181,6 +181,11 @@ body {
   align-items: center;
   padding: 1rem 1.5rem;
 }
+.welcome-message {
+  font-size: 1rem; /* Equivalent to text-base */
+  color: #64748b; /* Equivalent to text-slate-500 */
+  margin-bottom: 0.25rem; /* Equivalent to mb-1 */
+}
 .header-title {
   font-size: 1.25rem; /* Equivalent to text-xl */
   font-weight: 600; /* Equivalent to font-semibold */
@@ -285,6 +290,11 @@ body {
   border-radius: 0.5rem; /* Equivalent to rounded-lg */
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1); /* Equivalent to shadow */
   padding: 1.5rem;
+  transition: transform 0.2s ease, box-shadow 0.2s ease; /* Add transition for hover effect */
+}
+.card:hover {
+  transform: scale(1.02); /* Slight scale-up on hover */
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1); /* Increase shadow on hover */
 }
 .card-title {
   color: #64748b; /* Equivalent to text-slate-500 */
@@ -324,6 +334,22 @@ body {
   color: #64748b; /* Equivalent to text-slate-500 */
 }
 
+/* Progress Bar for Total Tasks */
+.progress-bar {
+  margin-top: 0.5rem; /* Equivalent to mt-2 */
+  width: 100%;
+  height: 0.5rem; /* Equivalent to h-2 */
+  background-color: #e2e8f0; /* Equivalent to bg-slate-200 */
+  border-radius: 9999px; /* Equivalent to rounded-full */
+  overflow: hidden;
+}
+.progress-fill {
+  height: 100%;
+  background-color: #16a34a; /* Equivalent to bg-green-600 */
+  border-radius: 9999px; /* Equivalent to rounded-full */
+  transition: width 0.3s ease; /* Smooth transition for progress */
+}
+
 .section {
   background-color: white;
   border-radius: 0.5rem; /* Equivalent to rounded-lg */
@@ -361,6 +387,21 @@ body {
   outline: none;
   ring: 2px solid #2563eb; /* Equivalent to focus:ring-blue-500 */
 }
+.priority-dot {
+  width: 0.75rem; /* Equivalent to w-3 */
+  height: 0.75rem; /* Equivalent to h-3 */
+  border-radius: 9999px; /* Equivalent to rounded-full */
+  margin-right: 0.5rem; /* Equivalent to mr-2 */
+}
+.priority-dot.high {
+  background-color: #dc2626; /* Equivalent to bg-red-600 */
+}
+.priority-dot.medium {
+  background-color: #d97706; /* Equivalent to bg-amber-500 */
+}
+.priority-dot.low {
+  background-color: #16a34a; /* Equivalent to bg-green-600 */
+}
 .task-text {
   color: #1e293b; /* Equivalent to text-slate-700 */
 }
@@ -397,9 +438,24 @@ body {
   background: none;
   border: none;
   cursor: pointer;
+  position: relative; /* For underline effect */
+  transition: color 0.2s ease; /* Smooth color transition */
 }
 .view-all-button:hover {
   color: #1e40af; /* Equivalent to hover:text-blue-800 */
+}
+.view-all-button::after {
+  content: '';
+  position: absolute;
+  width: 0;
+  height: 1px;
+  bottom: -2px;
+  left: 0;
+  background-color: #1e40af; /* Equivalent to bg-blue-800 */
+  transition: width 0.2s ease; /* Smooth underline animation */
+}
+.view-all-button:hover::after {
+  width: 100%; /* Underline grows on hover */
 }
 
 .notification-item {
@@ -422,9 +478,24 @@ body {
   background: none;
   border: none;
   cursor: pointer;
+  position: relative; /* For underline effect */
+  transition: color 0.2s ease; /* Smooth color transition */
 }
 .mark-as-read:hover {
   color: #1e40af; /* Equivalent to hover:text-blue-800 */
+}
+.mark-as-read::after {
+  content: '';
+  position: absolute;
+  width: 0;
+  height: 1px;
+  bottom: -2px;
+  left: 0;
+  background-color: #1e40af; /* Equivalent to bg-blue-800 */
+  transition: width 0.2s ease; /* Smooth underline animation */
+}
+.mark-as-read:hover::after {
+  width: 100%; /* Underline grows on hover */
 }
 
 /* Tasks Section */
