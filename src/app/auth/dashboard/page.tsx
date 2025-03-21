@@ -12,6 +12,7 @@ import "../styles/dashboard.css";
 declare module "next-auth" {
   interface Session {
     user: {
+      id?: string;
       name?: string | null;
       email?: string | null;
       image?: string | null;
@@ -27,6 +28,31 @@ interface Task {
   completed: boolean;
   dueDate?: string;
   priority?: "low" | "medium" | "high";
+}
+
+interface Subcontractor {
+  id: string;
+  name: string;
+  phone: string;
+  projects: string[];
+  role?: string;
+  status: string;
+}
+
+interface Project {
+  id: string;
+  name: string;
+  jobSiteAddress: string;
+  subcontractorIds: string[];
+}
+
+interface Schedule {
+  id: string;
+  projectId: string;
+  subcontractorId: string;
+  date: string;
+  time: string;
+  confirmed: boolean;
 }
 
 export default function Dashboard() {
@@ -45,6 +71,10 @@ export default function Dashboard() {
     { id: 4, text: "Update website content", completed: false, dueDate: "2025-03-28", priority: "low" },
   ];
 
+  const [selectedProject, setSelectedProject] = useState("");
+  const [subcontractors, setSubcontractors] = useState<Subcontractor[]>([]);
+  const [schedules, setSchedules] = useState<Schedule[]>([]);
+  const [projects, setProjects] = useState<Project[]>([]);
   const [tasks, setTasks] = useState<Task[]>(initialTasks);
   const [newTask, setNewTask] = useState("");
   const [newTaskDueDate, setNewTaskDueDate] = useState("");
@@ -63,6 +93,51 @@ export default function Dashboard() {
       router.push("/auth/login");
     }
   }, [status, router]);
+
+  // Fetch data on component mount
+    useEffect(() => {
+      const fetchData = async () => {
+        try {
+          const [subcontractorsRes, projectsRes, schedulesRes] = await Promise.all([
+            fetch("/api/subcontractors"),
+            fetch("/api/projects"),
+            fetch("/api/schedules"),
+          ]);
+  
+          const errors: string[] = [];
+          if (!subcontractorsRes.ok) {
+            const errorText = await subcontractorsRes.text();
+            errors.push(`Subcontractors API failed: ${subcontractorsRes.status} ${subcontractorsRes.statusText} - ${errorText}`);
+          }
+          if (!projectsRes.ok) {
+            const errorText = await projectsRes.text();
+            errors.push(`Projects API failed: ${projectsRes.status} ${projectsRes.statusText} - ${errorText}`);
+          }
+          if (!schedulesRes.ok) {
+            const errorText = await schedulesRes.text();
+            errors.push(`Schedules API failed: ${schedulesRes.status} ${schedulesRes.statusText} - ${errorText}`);
+          }
+  
+          if (errors.length > 0) {
+            console.error("API Errors:", errors);
+            throw new Error(errors.join("\n"));
+          }
+  
+          const subcontractorsData = await subcontractorsRes.json();
+          const projectsData = await projectsRes.json();
+          const schedulesData = await schedulesRes.json();
+  
+          setSubcontractors(subcontractorsData);
+          setProjects(projectsData);
+          setSchedules(schedulesData);
+        } catch (error) {
+          console.error("Error fetching data:", error);
+          setError(error instanceof Error ? error.message : "Failed to load data. Please try again later.");
+        }
+      };
+  
+      fetchData();
+    }, []);
 
   // Show a loading state while session is being fetched
   if (status === "loading") {
@@ -187,6 +262,15 @@ export default function Dashboard() {
             </li>
             <li>
               <button
+                onClick={() => setActiveSection("projects")}
+                className={activeSection === "projects" ? "active" : ""}
+              >
+                <FaProjectDiagram className="sidebar-icon" />
+                <span>Projects</span>
+              </button>
+            </li>
+            <li>
+              <button
                 onClick={() => setActiveSection("tasks")}
                 className={activeSection === "tasks" ? "active" : ""}
               >
@@ -253,6 +337,7 @@ export default function Dashboard() {
                 {activeSection === "calendar" && "Calendar"}
                 {activeSection === "profile" && "Your Profile"}
                 {activeSection === "settings" && "Settings"}
+                {activeSection === "projects" && "Projects"}
               </h2>
             </div>
 
@@ -390,6 +475,112 @@ export default function Dashboard() {
                       </li>
                     ))}
                   </ul>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Projects Section */}
+          {activeSection === "projects" && (
+            <div style={{ display: "flex", flexDirection: "column", gap: "1.5rem" }}>
+              <div className="section add-task-form">
+                <h3 className="add-task-title">Your Projects</h3>
+
+                <div className="add-task-grid">
+                  {projects.map((project) => (
+                    <div key={project.id} className="project-item">
+                      <div>
+                        <h3>{project.name}</h3>
+                        <p>{project.jobSiteAddress}</p>
+                      </div>
+                      <div>
+                        <p>Subcontractors: {project.subcontractorIds.length}</p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+
+                <div className="add-task-footer">
+                  <div style={{ display: "flex", alignItems: "center", gap: "1rem" }}>
+                    <label className="priority-label">
+                      <span>Priority:</span>
+                      <select
+                        value={newTaskPriority}
+                        onChange={(e) =>
+                          setNewTaskPriority(e.target.value as "low" | "medium" | "high")
+                        }
+                        className="priority-select"
+                      >
+                        <option value="low">Low</option>
+                        <option value="medium">Medium</option>
+                        <option value="high">High</option>
+                      </select>
+                    </label>
+                  </div>
+
+                  <button
+                    onClick={handleAddTask}
+                    className="add-task-button"
+                  >
+                    Add Task
+                  </button>
+                </div>
+
+                {error && <p className="error-message">{error}</p>}
+              </div>
+
+              <div className="section">
+                <div className="task-list-header">
+                  <h3 className="task-list-title">Task List</h3>
+                  <div className="task-list-stats">
+                    {completedTasks} of {tasks.length} completed
+                  </div>
+                </div>
+
+                <div className="task-list-content">
+                  <ul className="task-list">
+                    {tasks.map((task) => (
+                      <li key={task.id} className="task-item">
+                        <div className="task-item-details">
+                          <input
+                            type="checkbox"
+                            checked={task.completed}
+                            onChange={() => handleTaskCompletion(task.id)}
+                          />
+                          <span className={`task-text ${task.completed ? "completed" : ""}`}>
+                            {task.text}
+                          </span>
+                          {task.priority && (
+                            <span className={`task-priority-tag ${task.priority}`}>
+                              {task.priority}
+                            </span>
+                          )}
+                        </div>
+
+                        <div className="task-actions">
+                          {task.dueDate && (
+                            <span className={`task-due-date ${isOverdue(task.dueDate) && !task.completed ? "overdue" : ""}`}>
+                              {isOverdue(task.dueDate) && !task.completed ? "Overdue: " : "Due: "}
+                              {new Date(task.dueDate).toLocaleDateString()}
+                            </span>
+                          )}
+
+                          <button
+                            onClick={() => handleDeleteTask(task.id)}
+                            className="delete-button"
+                          >
+                            <FaTimes className="sidebar-icon" />
+                          </button>
+                        </div>
+                      </li>
+                    ))}
+                  </ul>
+
+                  {tasks.length === 0 && (
+                    <div className="no-tasks">
+                      No tasks yet. Add a task to get started.
+                    </div>
+                  )}
                 </div>
               </div>
             </div>

@@ -1,10 +1,34 @@
 // src/app/api/projects/route.ts
 import prisma from "@/lib/prisma";
+import { getServerSession } from "next-auth/next";
+import { authOptions } from "@/pages/api/auth/[...nextauth]";
 import { NextResponse } from "next/server";
 
 export async function GET() {
   try {
-    const projects = await prisma.project.findMany();
+    const session = await getServerSession(authOptions);
+    if (!session || !session.user?.id) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    const user = await prisma.user.findUnique({
+      where: { id: session.user.id },
+    });
+
+    console.log("User:", user);
+
+    if (!user) {
+      return NextResponse.json({ error: "User not found" }, { status: 404 });
+    }
+
+    console.log("Querying projects for userId:", user.id);
+
+    const projects = await prisma.project.findMany({
+      where: { userId: user.id },
+    });
+
+    console.log("Projects:", projects);
+
     return NextResponse.json(projects);
   } catch (error) {
     console.error("GET /api/projects error:", error);
@@ -14,6 +38,16 @@ export async function GET() {
 
 export async function POST(request: Request) {
   try {
+    const session = await getServerSession(authOptions);
+    
+    if (!session || !session.user?.id) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    // Find the user by email
+    const user = await prisma.user.findUnique({
+      where: { email: session.user.id as string },
+    });
     const { name, jobSiteAddress, subcontractorIds } = await request.json();
     if (!name || !jobSiteAddress) {
       return NextResponse.json({ error: "Missing required fields" }, { status: 400 });
@@ -23,6 +57,7 @@ export async function POST(request: Request) {
         name,
         jobSiteAddress,
         subcontractorIds: subcontractorIds || [],
+        userId: user?.id as string
       },
     });
     return NextResponse.json(project, { status: 201 });

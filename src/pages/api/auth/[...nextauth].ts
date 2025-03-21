@@ -1,11 +1,10 @@
-// src/pages/api/auth/[...nextauth].ts
-
-import NextAuth from "next-auth";
+import NextAuth, { AuthOptions } from "next-auth";
 import CredentialsProvider from "next-auth/providers/credentials";
 import bcrypt from "bcryptjs";
-import clientPromise from "../../../lib/mongodb"; // Import MongoDB connection helper
+import clientPromise from "../../../lib/mongodb";
 
-export default NextAuth({
+// Explicitly type authOptions as AuthOptions
+export const authOptions: AuthOptions = {
   providers: [
     CredentialsProvider({
       name: "Credentials",
@@ -14,33 +13,33 @@ export default NextAuth({
         password: { label: "Password", type: "password" },
       },
       async authorize(credentials) {
-        const client = await clientPromise; // Wait for MongoDB connection
-        const db = client.db("sandbox"); // Specify your DB name
+        const client = await clientPromise;
+        const db = client.db("sandbox");
 
-        // Find user in the MongoDB database
         const user = await db.collection("users").findOne({ email: credentials?.email });
 
-        // If user found and password matches, return user object
         if (user && bcrypt.compareSync(credentials?.password || "", user.passwordHash)) {
           return {
+            id: user._id.toString(), // Ensure ID is a string
             email: user.email,
             companyName: user.companyName,
             role: user.role,
           };
         }
-        return null; // If user not found or password doesn't match
+        return null;
       },
     }),
   ],
   pages: {
-    signIn: "/auth/login", // Customize the login page URL
+    signIn: "/auth/login",
   },
   session: {
-    strategy: "jwt", // Use JSON Web Tokens (JWT) for session management
+    strategy: "jwt" as const, // Use "as const" to enforce literal type
   },
   callbacks: {
     async jwt({ token, user }) {
       if (user) {
+        token.id = user.id;
         token.email = user.email;
         token.companyName = user.companyName;
         token.role = user.role;
@@ -48,10 +47,13 @@ export default NextAuth({
       return token;
     },
     async session({ session, token }) {
-      session.user.email = token.email;
-      session.user.companyName = token.companyName;
-      session.user.role = token.role;
+      session.user.id = token.id as string; // Ensure ID is typed as string
+      session.user.email = token.email as string;
+      session.user.companyName = token.companyName as string;
+      session.user.role = token.role as string;
       return session;
     },
   },
-});
+};
+
+export default NextAuth(authOptions);

@@ -7,6 +7,17 @@ datasource db {
   url      = "mongodb+srv://ryanandalex:Sandbox2025!@sandbox.s9imj.mongodb.net/sandbox?retryWrites=true&w=majority"
 }
 
+model User {
+  id           String       @id @default(auto()) @map("_id") @db.ObjectId
+  email        String       @unique
+  passwordHash String
+  companyName  String
+  role         String?
+  projects     Project[]
+
+  @@map("users")
+}
+
 model Subcontractor {
   id         String      @id @default(auto()) @map("_id") @db.ObjectId
   name       String
@@ -25,6 +36,8 @@ model Project {
   subcontractorIds   String[]             @db.ObjectId
   schedules          Schedule[]
   automatedMessages  AutomatedMessage[]
+  userId            String?   
+  user              User?    @relation(fields: [userId], references: [id])
 }
 
 model Schedule {
